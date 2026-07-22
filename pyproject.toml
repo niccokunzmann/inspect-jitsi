@@ -40,9 +40,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+cli = [
+    "typer >= 0.12",
+]
 test = [
     "pytest",
     "pytest-cov",
+    "inspect-jitsi[cli]",
 ]
 
 [project.scripts]

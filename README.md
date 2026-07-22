@@ -10,10 +10,11 @@ from inspect_jitsi import get_participant_count
 get_participant_count("https://meet.example.com/SomeRoomName")
 ```
 
-Or from the command line:
+Or from the command line (requires the `cli` extra, see below):
 
 ```sh
-inspect-jitsi https://meet.example.com/SomeRoomName
+inspect-jitsi count https://meet.example.com/SomeRoomName
+inspect-jitsi diagnose https://meet.example.com/SomeRoomName
 ```
 
 This briefly joins the room's MUC as an anonymous occupant to read the
@@ -34,5 +35,6 @@ diagnose_jitsi_access("https://meet.example.com/SomeRoomName")
 ## Installing
 
 ```sh
-pip install -e .
+pip install -e .          # Python API only
+pip install -e ".[cli]"   # + the inspect-jitsi command line tool
 ```
