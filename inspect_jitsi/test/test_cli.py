@@ -134,3 +134,34 @@ def test_created_exits_2_on_failure(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert result.exit_code == 2  # noqa: PLR2004
     assert "boom" in result.output
+
+
+def test_created_json_prints_true_and_exits_0(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cli, "is_room_created", lambda url: True)  # noqa: ARG005
+
+    result = runner.invoke(cli.app, ["created", "--json", "https://meet.example.com/room"])
+
+    assert result.exit_code == 0
+    assert result.stdout.strip() == "true"
+
+
+def test_created_json_prints_false_and_exits_1(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cli, "is_room_created", lambda url: False)  # noqa: ARG005
+
+    result = runner.invoke(cli.app, ["created", "--json", "https://meet.example.com/room"])
+
+    assert result.exit_code == 1
+    assert result.stdout.strip() == "false"
+
+
+def test_created_json_reports_error_and_exits_2(monkeypatch: pytest.MonkeyPatch) -> None:
+    def failing_is_room_created(_url: str) -> bool:
+        msg = "boom"
+        raise RuntimeError(msg)
+
+    monkeypatch.setattr(cli, "is_room_created", failing_is_room_created)
+
+    result = runner.invoke(cli.app, ["created", "--json", "https://meet.example.com/room"])
+
+    assert result.exit_code == 2  # noqa: PLR2004
+    assert json.loads(result.output)["error"] == "boom"

@@ -74,13 +74,23 @@ def diagnose(conference_url: str) -> None:
 
 
 @app.command()
-def created(conference_url: str) -> None:
-    """Exit 0 if the room exists, 1 if it doesn't. Prints nothing on success."""
+def created(
+    conference_url: str,
+    json_output: bool = typer.Option(
+        False, "--json", help="Print true/false as JSON, in addition to the exit code."
+    ),
+) -> None:
+    """Exit 0 if the room exists, 1 if not. Prints nothing unless --json is given."""
     try:
         exists = is_room_created(conference_url)
     except Exception as exc:
-        typer.echo(f"Failed to check whether the room exists: {exc}", err=True)
+        if json_output:
+            typer.echo(json.dumps({"error": str(exc)}), err=True)
+        else:
+            typer.echo(f"Failed to check whether the room exists: {exc}", err=True)
         raise typer.Exit(2) from exc
+    if json_output:
+        typer.echo(json.dumps(exists))
     raise typer.Exit(0 if exists else 1)
 
 
