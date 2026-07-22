@@ -1,0 +1,9 @@
+jitsi-conference-mapper
+jitsi-plugin
+jupyterlab-jitsi
+jupyter-videochat
+PyLivestream
+lib-jitsi-meet
+jitsi-meet
+__pycache__
+*.pyc
