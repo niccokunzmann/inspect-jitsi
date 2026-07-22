@@ -64,6 +64,7 @@ Homepage = "https://github.com/niccokunzmann/inspect-jitsi"
 Repository = "https://github.com/niccokunzmann/inspect-jitsi"
 "Source Archive" = "https://github.com/niccokunzmann/inspect-jitsi/archive/{commit_hash}.zip"
 Issues = "https://github.com/niccokunzmann/inspect-jitsi/issues"
+Changelog = "https://github.com/niccokunzmann/inspect-jitsi/blob/main/CHANGES.md"
 
 [tool.hatch.version]
 source = "vcs"
