@@ -2,34 +2,60 @@
 
 Tools for inspecting a running [Jitsi Meet](https://jitsi.org/) deployment.
 
-## Quick, one-shot functions
+## Command Line API
+
+The command line requires installing `inspect-jitsi[cli]`.
+
+First, join or leave the room at [meet.hosted.quelltext.eu/inspect-jitsi](https://meet.hosted.quelltext.eu/inspect-jitsi).
+Then run the commands:
+
+
+```sh
+inspect-jitsi count https://meet.hosted.quelltext.eu/inspect-jitsi
+inspect-jitsi participants https://meet.hosted.quelltext.eu/inspect-jitsi
+inspect-jitsi diagnose https://meet.hosted.quelltext.eu/inspect-jitsi
+inspect-jitsi created https://meet.hosted.quelltext.eu/inspect-jitsi
+```
+
+| Command | Prints | Exit code |
+| --- | --- | --- |
+| `count <url>` | number of participants | 0, or 1 on failure |
+| `participants <url>` | participants as indented JSON | 0, or 1 on failure |
+| `diagnose <url>` | connectivity/auth report as indented JSON | 0, or 1 on failure |
+| `created <url>` | nothing (use `--json` to print `true`/`false`) | 0 if the room exists, 1 if not, 2 on failure |
+
+`count`/`participants` fall back to running `diagnose` and printing its report
+to stderr if they fail, to help explain why (e.g. a token being required).
+
+## Python API (Sync)
 
 ```python
-from inspect_jitsi import get_participant_count, get_participants, diagnose_jitsi_access
+from inspect_jitsi import (
+    get_participant_count,
+    get_participants,
+    diagnose_jitsi_access,
+    is_room_created,
+)
 
 get_participant_count("https://meet.example.com/SomeRoomName")   # -> 2
 get_participants("https://meet.example.com/SomeRoomName")        # -> [Participant(...), ...]
 diagnose_jitsi_access("https://meet.example.com/SomeRoomName")   # -> DiagnosisResult(...)
+is_room_created("https://meet.example.com/SomeRoomName")         # -> True
 ```
 
-Or from the command line (requires the `cli` extra, see below):
+| Function | Returns |
+| --- | --- |
+| `get_participant_count(url, nick=None, ...)` | `int` |
+| `get_participants(url, nick=None, ...)` | `list[Participant]` |
+| `diagnose_jitsi_access(url, ...)` | `DiagnosisResult` |
+| `is_room_created(url, ...)` | `bool` |
 
-```sh
-inspect-jitsi count https://meet.example.com/SomeRoomName
-inspect-jitsi participants https://meet.example.com/SomeRoomName
-inspect-jitsi diagnose https://meet.example.com/SomeRoomName
-```
+`Participant` and `DiagnosisResult` are dataclasses with `.to_dict()` (and
+`Participant` also has `.to_json()`) for easy serialization. `Participant`
+carries `jid`, `nick`, `name` (display name, if disclosed), `role`,
+`affiliation`, `real_jid`, and `occupant_id`.
 
-Each call briefly opens its own connection, reads what's needed, and closes
-again - see "How it works" below for why that's necessary and what it means
-in practice.
-
-If anonymous login is rejected (e.g. by servers like meet.jit.si that now
-require a token), `diagnose_jitsi_access`/`inspect-jitsi diagnose` reports
-what's going on (which SASL mechanisms are offered, whether anonymous login
-succeeded, etc).
-
-## Async API
+## Python API (Async)
 
 For anything beyond a single one-shot call - e.g. holding a room open and
 polling it repeatedly - use `JitsiConference` directly instead of the sync
@@ -41,29 +67,18 @@ from inspect_jitsi import JitsiConference
 
 async def main():
     async with JitsiConference("https://meet.example.com/SomeRoomName") as conference:
+        print(await conference.is_created())      # -> True, without joining
         print(await conference.get_participants())
 
 asyncio.run(main())
 ```
 
-## Package layout
-
-- `inspect_jitsi.xmpp.JitsiXmppConnection` - the low-level anonymous
-  XMPP/MUC connection (stream negotiation, SASL, presence parsing).
-- `inspect_jitsi.xmpp.JitsiConference` - the public async handle on a room,
-  built on top of a `JitsiXmppConnection`. Has `open()`/`close()`,
-  `get_participants()`, and `diagnose()`.
-- `inspect_jitsi.xmpp.Participant` - one occupant of a room (jid, nick,
-  display name, role, affiliation, ...), with `.to_dict()`/`.to_json()`.
-- `inspect_jitsi.xmpp.DiagnosisResult` - the result of `diagnose()`, with
-  `.to_dict()`.
-- `inspect_jitsi.sync` - synchronous, one-shot convenience functions
-  (`get_participant_count`, `get_participants`, `diagnose_jitsi_access`)
-  built on top of `JitsiConference`.
-- `inspect_jitsi.cli` - the `inspect-jitsi` command line tool (`typer`
-  based; needs the `cli` extra).
-
 ## How it works
+
+<details>
+<summary>
+We try joining the room as a participant and inspect who is there.
+</summary>
 
 Jitsi's prosody deployment locks down `disco#info` on MUC rooms to
 occupants only (confirmed live: a bare `disco#info` query gets
@@ -95,12 +110,14 @@ JID must use the internal names. `discover_hosts` figures these out
 automatically by reading the site's public `/config.js` (the same file the
 browser client itself relies on), rather than guessing.
 
+</details>
+
 ## Installing
 
 ```sh
 pip install -e .          # Python API only
 pip install -e ".[cli]"   # + the inspect-jitsi command line tool
-pip install -e ".[test]"  # + test dependencies (pytest, pytest-asyncio, ...)
+pip install -e ".[test]"  # + test dependencies
 ```
 
 ## Testing
