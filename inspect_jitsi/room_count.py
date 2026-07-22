@@ -1,5 +1,16 @@
-"""
-Get the number of people currently in a Jitsi Meet room, from just its URL.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""Count the participants currently in a Jitsi Meet room, from just its URL.
 
 Jitsi's prosody deployment locks down disco#info on MUC rooms to occupants
 only (confirmed live: a bare disco#info query gets `<error type="auth">
@@ -21,8 +32,6 @@ don't expose raw XMPP client-to-server (5222) publicly - so this hand-rolls
 the small slice of RFC 6120 (stream/SASL/bind) and RFC 7395 (XMPP over
 WebSocket framing) needed to join a MUC room.
 
-Requires: pip install websockets
-
 Deployments (e.g. docker-jitsi-meet) commonly use an *internal* XMPP domain
 (typically "meet.jitsi") and MUC component (typically "muc.meet.jitsi") that
 are different from the public hostname in the URL - the public web server
@@ -32,6 +41,8 @@ these out automatically by reading the site's public /config.js (the same
 file the browser client itself relies on), rather than guessing.
 """
 
+from __future__ import annotations
+
 import asyncio
 import re
 import urllib.request
@@ -40,6 +51,8 @@ import xml.etree.ElementTree as ET
 from urllib.parse import urlparse
 
 import websockets
+
+__all__ = ["diagnose_jitsi_access", "discover_hosts", "get_participant_count"]
 
 _NS_FRAMING = "urn:ietf:params:xml:ns:xmpp-framing"
 _NS_SASL = "urn:ietf:params:xml:ns:xmpp-sasl"
@@ -59,7 +72,8 @@ def _parse_conference_url(conference_url: str) -> tuple[str, str]:
     domain = parsed.netloc
     room = parsed.path.strip("/").split("/")[0]
     if not domain or not room:
-        raise ValueError(f"Could not parse a Jitsi domain/room from URL: {conference_url!r}")
+        msg = f"Could not parse a Jitsi domain/room from URL: {conference_url!r}"
+        raise ValueError(msg)
     return domain, room
 
 
@@ -75,20 +89,22 @@ def _eval_js_string_concat(expr: str, variables: dict[str, str]) -> str:
     return "".join(result)
 
 
-def discover_hosts(domain: str, timeout: float = 10) -> dict:
-    """
-    Read https://<domain>/config.js to find the real XMPP/MUC/anonymous
-    domains a Jitsi deployment uses, since these often differ from the
-    public hostname (e.g. docker-jitsi-meet defaults to "meet.jitsi"
-    internally). Returns a dict with keys "domain", "muc", "anonymousdomain"
-    - any of which may be None if not found.
+def discover_hosts(domain: str, timeout: float = 10) -> dict[str, str | None]:
+    """Read https://<domain>/config.js to find the real XMPP/MUC domains.
+
+    A Jitsi deployment's internal domain names often differ from the public
+    hostname (e.g. docker-jitsi-meet defaults to "meet.jitsi" internally).
+    Returns a dict with keys "domain", "muc", "anonymousdomain" - any of
+    which may be None if not found.
     """
     url = f"https://{domain}/config.js"
-    with urllib.request.urlopen(url, timeout=timeout) as response:
+    with urllib.request.urlopen(url, timeout=timeout) as response:  # noqa: S310
         text = response.read().decode("utf-8", errors="replace")
 
     variables = {}
-    for match in re.finditer(r"var\s+(\w+)\s*=\s*('(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\")\s*;", text):
+    for match in re.finditer(
+        r"var\s+(\w+)\s*=\s*('(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\")\s*;", text
+    ):
         name, literal = match.group(1), match.group(2)
         variables[name] = literal[1:-1]
 
@@ -112,8 +128,7 @@ def _is_self_presence(presence: ET.Element) -> bool:
     if muc_x is None:
         return False
     return any(
-        _local(status.tag) == "status" and status.get("code") == "110"
-        for status in muc_x
+        _local(status.tag) == "status" and status.get("code") == "110" for status in muc_x
     )
 
 
@@ -121,18 +136,18 @@ async def _open_authenticated_stream(ws, xmpp_domain: str, timeout: float) -> No
     await ws.send(f'<open xmlns="{_NS_FRAMING}" to="{xmpp_domain}" version="1.0"/>')
     opened = await _recv_stanza(ws, timeout)
     if _local(opened.tag) == "error":
-        raise RuntimeError(
-            f"Stream error opening to {xmpp_domain!r}: {ET.tostring(opened, encoding='unicode')}"
-        )
+        msg = f"Stream error opening to {xmpp_domain!r}: {ET.tostring(opened, encoding='unicode')}"
+        raise RuntimeError(msg)
     await _recv_stanza(ws, timeout)  # <stream:features>
 
     await ws.send(f'<auth xmlns="{_NS_SASL}" mechanism="ANONYMOUS"/>')
     result = await _recv_stanza(ws, timeout)
     if _local(result.tag) != "success":
-        raise RuntimeError(
+        msg = (
             f"Anonymous XMPP login to {xmpp_domain!r} was rejected: "
             f"{ET.tostring(result, encoding='unicode')}"
         )
+        raise RuntimeError(msg)
 
     # Restart the stream post-auth, as required by RFC 6120.
     await ws.send(f'<open xmlns="{_NS_FRAMING}" to="{xmpp_domain}" version="1.0"/>')
@@ -151,9 +166,7 @@ async def _get_participant_count_async(
     nick = f"room-count-probe-{uuid.uuid4().hex[:8]}"
     occupant_jid = f"{room_jid}/{nick}"
 
-    async with websockets.connect(
-        ws_url, subprotocols=["xmpp"], open_timeout=timeout
-    ) as ws:
+    async with websockets.connect(ws_url, subprotocols=["xmpp"], open_timeout=timeout) as ws:
         await _open_authenticated_stream(ws, xmpp_domain, timeout)
 
         # Joining a MUC room is just sending presence to <room>/<nick>.
@@ -174,10 +187,11 @@ async def _get_participant_count_async(
                         continue
 
                     if stanza.get("type") == "error":
-                        raise RuntimeError(
+                        msg = (
                             f"Failed to join room {room_jid!r}: "
                             f"{ET.tostring(stanza, encoding='unicode')}"
                         )
+                        raise RuntimeError(msg)
 
                     if stanza.get("type") != "unavailable":
                         from_jid = stanza.get("from")
@@ -206,8 +220,7 @@ def get_participant_count(
     muc_domain: str | None = None,
     timeout: float = 10,
 ) -> int:
-    """
-    Return the number of participants currently in a Jitsi Meet room.
+    """Return the number of participants currently in a Jitsi Meet room.
 
     Briefly joins the room as an anonymous occupant to read the presence
     roster, then leaves - see the module docstring for why this is necessary
@@ -225,13 +238,14 @@ def get_participant_count(
     Returns:
         Number of people already in the room, not counting this probe
         (0 if the room is empty).
+
     """
     ws_domain, room = _parse_conference_url(conference_url)
 
     if anonymous_domain is None or muc_domain is None:
         try:
             hosts = discover_hosts(ws_domain, timeout=timeout)
-        except Exception:
+        except Exception:  # noqa: BLE001
             hosts = {"domain": None, "muc": None, "anonymousdomain": None}
         xmpp_domain = hosts["domain"] or ws_domain
         anonymous_domain = anonymous_domain or hosts["anonymousdomain"] or xmpp_domain
@@ -241,20 +255,19 @@ def get_participant_count(
 
     room_jid = f"{room.lower()}@{muc_domain}"
 
-    return asyncio.run(
-        _get_participant_count_async(ws_domain, anonymous_domain, room_jid, timeout)
-    )
+    return asyncio.run(_get_participant_count_async(ws_domain, anonymous_domain, room_jid, timeout))
 
 
 def diagnose_jitsi_access(conference_url: str, timeout: float = 10) -> dict:
-    """
-    Probe a Jitsi deployment and report what's needed to read room occupant
-    counts: whether /config.js was readable, which internal domains it
+    """Probe a Jitsi deployment and report what's needed to read occupant counts.
+
+    Checks whether /config.js was readable, which internal domains it
     advertises, whether the XMPP domain is actually served over the
     WebSocket endpoint, which SASL mechanisms it offers, and whether
     anonymous login succeeds (i.e. whether a token/JWT is required).
 
-    Returns a dict, safe to print/json.dumps, e.g.:
+    Returns a dict, safe to print/json.dumps, e.g.::
+
         {
             "ws_domain": "meet.example.com",
             "config_js_reachable": True,
@@ -265,6 +278,7 @@ def diagnose_jitsi_access(conference_url: str, timeout: float = 10) -> dict:
             "anonymous_login_ok": True,
             "error": None,
         }
+
     """
     ws_domain, _ = _parse_conference_url(conference_url)
     report: dict = {
@@ -283,13 +297,13 @@ def diagnose_jitsi_access(conference_url: str, timeout: float = 10) -> dict:
         report["config_js_reachable"] = True
         report["discovered_hosts"] = hosts
         xmpp_domain = hosts["anonymousdomain"] or hosts["domain"] or ws_domain
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         xmpp_domain = ws_domain
         report["error"] = f"config.js: {exc}"
 
     report["xmpp_domain_tried"] = xmpp_domain
 
-    async def probe():
+    async def probe() -> None:
         ws_url = f"wss://{ws_domain}/xmpp-websocket"
         async with websockets.connect(ws_url, subprotocols=["xmpp"], open_timeout=timeout) as ws:
             await ws.send(f'<open xmlns="{_NS_FRAMING}" to="{xmpp_domain}" version="1.0"/>')
@@ -301,11 +315,7 @@ def diagnose_jitsi_access(conference_url: str, timeout: float = 10) -> dict:
             report["domain_recognized"] = True
 
             features = await _recv_stanza(ws, timeout)
-            mechanisms = [
-                m.text
-                for m in features.iter()
-                if _local(m.tag) == "mechanism" and m.text
-            ]
+            mechanisms = [m.text for m in features.iter() if _local(m.tag) == "mechanism" and m.text]
             report["sasl_mechanisms"] = mechanisms
 
             if "ANONYMOUS" not in mechanisms:
@@ -323,26 +333,8 @@ def diagnose_jitsi_access(conference_url: str, timeout: float = 10) -> dict:
 
     try:
         asyncio.run(probe())
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         if report["error"] is None:
             report["error"] = str(exc)
 
     return report
-
-
-if __name__ == "__main__":
-    import json
-    import sys
-
-    if len(sys.argv) != 2:
-        print(f"Usage: {sys.argv[0]} <jitsi-conference-url>")
-        sys.exit(1)
-
-    url = sys.argv[1]
-    try:
-        print(get_participant_count(url))
-    except Exception as exc:
-        print(f"Failed to get participant count: {exc}", file=sys.stderr)
-        print("Running diagnostics...", file=sys.stderr)
-        print(json.dumps(diagnose_jitsi_access(url), indent=2), file=sys.stderr)
-        sys.exit(1)

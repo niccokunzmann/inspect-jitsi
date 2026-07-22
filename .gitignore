@@ -7,3 +7,9 @@ lib-jitsi-meet
 jitsi-meet
 __pycache__
 *.pyc
+python-recurring-ical-events
+inspect_jitsi/_version.py
+*.egg-info
+/build
+/dist
+.pytest_cache/

@@ -1,0 +1,104 @@
+[build-system]
+requires = ["hatchling>=1.27.0", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "inspect-jitsi"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+keywords = ["jitsi", "jitsi-meet", "xmpp", "muc", "monitoring"]
+dynamic = ["urls", "version"]
+authors = [
+  { name="Nicco Kunzmann", email="niccokunzmann@rambler.ru" },
+]
+maintainers = [
+  { name="Nicco Kunzmann", email="niccokunzmann@rambler.ru" },
+]
+description = "Tools for inspecting a running Jitsi Meet deployment, e.g. counting the participants in a room from its URL."
+readme = "README.md"
+requires-python = ">=3.11"
+
+# see https://pypi.python.org/pypi?%3Aaction=list_classifiers
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Topic :: Communications :: Conferencing",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Utilities",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+
+dependencies = [
+    "websockets >= 12.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-cov",
+]
+
+[project.scripts]
+inspect-jitsi = "inspect_jitsi.cli:main"
+
+[tool.hatch.metadata.hooks.vcs.urls]
+#[project.urls]
+Homepage = "https://github.com/niccokunzmann/inspect-jitsi"
+Repository = "https://github.com/niccokunzmann/inspect-jitsi"
+"Source Archive" = "https://github.com/niccokunzmann/inspect-jitsi/archive/{commit_hash}.zip"
+Issues = "https://github.com/niccokunzmann/inspect-jitsi/issues"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+# see https://github.com/ofek/hatch-vcs/issues/43#issuecomment-1553065222
+local_scheme = "no-local-version"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "inspect_jitsi/_version.py"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.ruff]
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "ANN",     # flake8-annotations
+    "B020",    # Loop control variable {name} overrides iterable it iterates
+    "C401",    # Unnecessary generator (rewrite as a set comprehension)
+    "C901",    # {name} is too complex ({complexity} > {max_complexity})
+    "COM812",  # Trailing comma missing
+    "D1",      # Missing docstring
+    "D2",      # docstrings stuffs
+    "D4",      # docstrings stuffs
+    "EM10",    # Exception string usage
+    "ERA001",  # Found commented-out code
+    "FBT002",  # Boolean default positional argument in function definition
+    "FIX",     # TODO comments
+    "ISC001",  # Implicitly concatenated string literals on one line (to avoid with formatter)
+    "N818",    # Exception name {name} should be named with an Error suffix
+    "PLR091",  # Too many things (complexity, arguments, branches, etc...)
+    "PLR2004", # Magic value used in comparison, consider replacing {value} with a constant variable
+    "RUF012",  # Mutable class attributes should be annotated with typing.ClassVar
+    "RUF015",  # Prefer next({iterable}) over single element slice
+    "S101",    # Use of assert detected
+    "TD",      # TODO comments
+    "TRY003",  # Avoid specifying long messages outside the exception class
+    "UP007",   # Use | None instead of Optional
+]
+
+[tool.ruff.lint.per-file-ignores]
+"inspect_jitsi/test/*" = [
+    "T201",   # print found
+]
