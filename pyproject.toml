@@ -36,6 +36,7 @@ classifiers = [
 ]
 
 dependencies = [
+    "niquests >= 3.7.0",
     "websockets >= 12.0",
 ]
 
@@ -45,12 +46,17 @@ cli = [
 ]
 test = [
     "pytest",
+    "pytest-asyncio",
     "pytest-cov",
     "inspect-jitsi[cli]",
 ]
 
 [project.scripts]
 inspect-jitsi = "inspect_jitsi.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["inspect_jitsi"]
+asyncio_mode = "auto"
 
 [tool.hatch.metadata.hooks.vcs.urls]
 #[project.urls]

@@ -10,26 +10,12 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""Tools for inspecting a running Jitsi Meet deployment."""
+"""Synchronous, one-shot convenience functions built on :mod:`inspect_jitsi.xmpp`."""
 
 from __future__ import annotations
 
-from inspect_jitsi.sync import diagnose_jitsi_access, get_participant_count, get_participants
-from inspect_jitsi.xmpp import (
-    DiagnosisResult,
-    JitsiConference,
-    JitsiXmppConnection,
-    Participant,
-    discover_hosts,
-)
+from inspect_jitsi.sync.count import get_participant_count
+from inspect_jitsi.sync.diagnose import diagnose_jitsi_access
+from inspect_jitsi.sync.participants import get_participants
 
-__all__ = [
-    "DiagnosisResult",
-    "JitsiConference",
-    "JitsiXmppConnection",
-    "Participant",
-    "diagnose_jitsi_access",
-    "discover_hosts",
-    "get_participant_count",
-    "get_participants",
-]
+__all__ = ["diagnose_jitsi_access", "get_participant_count", "get_participants"]

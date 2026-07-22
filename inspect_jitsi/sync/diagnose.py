@@ -10,26 +10,21 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""Tools for inspecting a running Jitsi Meet deployment."""
+"""`diagnose_jitsi_access`: a one-shot report of what's needed to read a room's occupancy."""
 
 from __future__ import annotations
 
-from inspect_jitsi.sync import diagnose_jitsi_access, get_participant_count, get_participants
-from inspect_jitsi.xmpp import (
-    DiagnosisResult,
-    JitsiConference,
-    JitsiXmppConnection,
-    Participant,
-    discover_hosts,
-)
+import asyncio
 
-__all__ = [
-    "DiagnosisResult",
-    "JitsiConference",
-    "JitsiXmppConnection",
-    "Participant",
-    "diagnose_jitsi_access",
-    "discover_hosts",
-    "get_participant_count",
-    "get_participants",
-]
+from inspect_jitsi.xmpp.conference import JitsiConference
+from inspect_jitsi.xmpp.diagnosis import DiagnosisResult
+
+__all__ = ["diagnose_jitsi_access"]
+
+
+def diagnose_jitsi_access(conference_url: str, timeout: float = 10) -> DiagnosisResult:
+    """Probe a Jitsi deployment and report what's needed to read occupant counts.
+
+    See :meth:`inspect_jitsi.xmpp.JitsiConference.diagnose` for details.
+    """
+    return asyncio.run(JitsiConference(conference_url, timeout=timeout).diagnose())

@@ -10,7 +10,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""Command line interface: ``inspect-jitsi count|diagnose <conference-url>``.
+"""Command line interface: ``inspect-jitsi count|participants|diagnose <conference-url>``.
 
 Requires the "cli" extra: ``pip install inspect-jitsi[cli]``.
 """
@@ -25,7 +25,7 @@ except ModuleNotFoundError as exc:
     msg = "The inspect-jitsi CLI requires the 'cli' extra: pip install inspect-jitsi[cli]"
     raise ModuleNotFoundError(msg) from exc
 
-from inspect_jitsi.room_count import diagnose_jitsi_access, get_participant_count
+from inspect_jitsi.sync import diagnose_jitsi_access, get_participant_count, get_participants
 
 app = typer.Typer(
     add_completion=False,
@@ -34,22 +34,37 @@ app = typer.Typer(
 )
 
 
+def _fail(action: str, conference_url: str, exc: Exception) -> None:
+    typer.echo(f"Failed to {action}: {exc}", err=True)
+    typer.echo("Running diagnostics...", err=True)
+    typer.echo(json.dumps(diagnose_jitsi_access(conference_url).to_dict(), indent=2), err=True)
+    raise typer.Exit(1) from exc
+
+
 @app.command()
 def count(conference_url: str) -> None:
     """Print the number of participants currently in a Jitsi Meet room."""
     try:
         typer.echo(get_participant_count(conference_url))
     except Exception as exc:  # noqa: BLE001
-        typer.echo(f"Failed to get participant count: {exc}", err=True)
-        typer.echo("Running diagnostics...", err=True)
-        typer.echo(json.dumps(diagnose_jitsi_access(conference_url), indent=2), err=True)
-        raise typer.Exit(1) from exc
+        _fail("get participant count", conference_url, exc)
+
+
+@app.command()
+def participants(conference_url: str) -> None:
+    """Print the participants currently in a Jitsi Meet room, as indented JSON."""
+    try:
+        people = get_participants(conference_url)
+    except Exception as exc:  # noqa: BLE001
+        _fail("get participants", conference_url, exc)
+        return
+    typer.echo(json.dumps([p.to_dict() for p in people], indent=2))
 
 
 @app.command()
 def diagnose(conference_url: str) -> None:
     """Print connectivity/auth diagnostics for a Jitsi deployment."""
-    typer.echo(json.dumps(diagnose_jitsi_access(conference_url), indent=2))
+    typer.echo(json.dumps(diagnose_jitsi_access(conference_url).to_dict(), indent=2))
 
 
 def main() -> None:

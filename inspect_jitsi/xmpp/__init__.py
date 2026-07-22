@@ -10,26 +10,19 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""Tools for inspecting a running Jitsi Meet deployment."""
+"""Low-level anonymous XMPP/MUC connection to a Jitsi Meet room."""
 
 from __future__ import annotations
 
-from inspect_jitsi.sync import diagnose_jitsi_access, get_participant_count, get_participants
-from inspect_jitsi.xmpp import (
-    DiagnosisResult,
-    JitsiConference,
-    JitsiXmppConnection,
-    Participant,
-    discover_hosts,
-)
+from inspect_jitsi.xmpp.conference import JitsiConference
+from inspect_jitsi.xmpp.connection import JitsiXmppConnection, discover_hosts
+from inspect_jitsi.xmpp.diagnosis import DiagnosisResult
+from inspect_jitsi.xmpp.participant import Participant
 
 __all__ = [
     "DiagnosisResult",
     "JitsiConference",
     "JitsiXmppConnection",
     "Participant",
-    "diagnose_jitsi_access",
     "discover_hosts",
-    "get_participant_count",
-    "get_participants",
 ]
