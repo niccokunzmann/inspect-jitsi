@@ -137,6 +137,39 @@ def unavailable_presence(nick: str, *, room_jid: str = ROOM_JID) -> str:
     return f"<presence xmlns='jabber:client' type='unavailable' from='{room_jid}/{nick}'/>"
 
 
+def room_creation_restricted_presence(nick: str, *, room_jid: str = ROOM_JID) -> str:
+    """Presence error for joining a room that doesn't exist, on a deployment
+    that restricts room creation to privileged users (jicofo) - i.e. this
+    room is empty, not a genuine failure."""
+    muc_domain = room_jid.split("@", 1)[1]
+    return (
+        f"<presence xmlns='jabber:client' type='error' from='{room_jid}/{nick}'>"
+        f"<error type='cancel' by='{muc_domain}'>"
+        "<not-allowed xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/>"
+        "<text xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'>Room creation is restricted</text>"
+        "</error></presence>"
+    )
+
+
+def room_not_found_disco_error(*, room_jid: str = ROOM_JID) -> str:
+    """disco#info error for a room that doesn't currently exist."""
+    muc_domain = room_jid.split("@", 1)[1]
+    return (
+        f"<iq xmlns='jabber:client' id='disco1' type='error' from='{room_jid}'>"
+        f"<error type='cancel' by='{muc_domain}'>"
+        "<item-not-found xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/>"
+        "</error></iq>"
+    )
+
+
+def forbidden_disco_error(*, room_jid: str = ROOM_JID) -> str:
+    """disco#info error for a room that exists but restricts disco to occupants."""
+    return (
+        f"<iq xmlns='jabber:client' id='disco1' type='error' from='{room_jid}'>"
+        "<error type='auth'><forbidden xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/></error></iq>"
+    )
+
+
 def join_script(nick: str, other_occupants: tuple[str, ...] = (), *, include_focus: bool = True) -> list[str]:
     """Presence stanzas the MUC sends back after a join, ending with self-presence."""
     script = [occupant_presence(other) for other in other_occupants]

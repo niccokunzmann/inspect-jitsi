@@ -10,8 +10,9 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""Command line interface: ``inspect-jitsi count|participants|diagnose <conference-url>``.
+"""Command line interface.
 
+``inspect-jitsi count|participants|diagnose|created <conference-url>``.
 Requires the "cli" extra: ``pip install inspect-jitsi[cli]``.
 """
 
@@ -25,7 +26,12 @@ except ModuleNotFoundError as exc:
     msg = "The inspect-jitsi CLI requires the 'cli' extra: pip install inspect-jitsi[cli]"
     raise ModuleNotFoundError(msg) from exc
 
-from inspect_jitsi.sync import diagnose_jitsi_access, get_participant_count, get_participants
+from inspect_jitsi.sync import (
+    diagnose_jitsi_access,
+    get_participant_count,
+    get_participants,
+    is_room_created,
+)
 
 app = typer.Typer(
     add_completion=False,
@@ -65,6 +71,17 @@ def participants(conference_url: str) -> None:
 def diagnose(conference_url: str) -> None:
     """Print connectivity/auth diagnostics for a Jitsi deployment."""
     typer.echo(json.dumps(diagnose_jitsi_access(conference_url).to_dict(), indent=2))
+
+
+@app.command()
+def created(conference_url: str) -> None:
+    """Exit 0 if the room exists, 1 if it doesn't. Prints nothing on success."""
+    try:
+        exists = is_room_created(conference_url)
+    except Exception as exc:
+        typer.echo(f"Failed to check whether the room exists: {exc}", err=True)
+        raise typer.Exit(2) from exc
+    raise typer.Exit(0 if exists else 1)
 
 
 def main() -> None:

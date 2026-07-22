@@ -14,7 +14,12 @@
 
 from __future__ import annotations
 
-from inspect_jitsi.sync import diagnose_jitsi_access, get_participant_count, get_participants
+from inspect_jitsi.sync import (
+    diagnose_jitsi_access,
+    get_participant_count,
+    get_participants,
+    is_room_created,
+)
 from inspect_jitsi.xmpp import (
     DiagnosisResult,
     JitsiConference,
@@ -32,4 +37,5 @@ __all__ = [
     "discover_hosts",
     "get_participant_count",
     "get_participants",
+    "is_room_created",
 ]

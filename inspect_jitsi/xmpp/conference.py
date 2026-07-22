@@ -25,13 +25,18 @@ import xml.etree.ElementTree as ET
 import websockets
 
 from inspect_jitsi.xmpp.connection import (
+    _NS_DISCO_INFO,
     _NS_FRAMING,
     _NS_SASL,
+    ROOM_NOT_FOUND,
     JitsiXmppConnection,
+    _error_condition,
     _local,
+    _open_authenticated_stream,
     _recv_stanza,
     discover_hosts,
     parse_conference_url,
+    resolve_domains,
 )
 from inspect_jitsi.xmpp.diagnosis import DiagnosisResult
 from inspect_jitsi.xmpp.participant import Participant
@@ -45,11 +50,12 @@ class JitsiConference:
     Use as an async context manager::
 
         async with JitsiConference(conference_url, "probe") as conference:
-            print(await conference.get_participant_count())
+            print(await conference.get_participants())
 
-    or call :meth:`open`/:meth:`close` directly. :meth:`diagnose` can be
-    called standalone, without opening the conference, to check what's
-    needed to join at all (e.g. whether the server requires a token).
+    or call :meth:`open`/:meth:`close` directly. :meth:`diagnose` and
+    :meth:`is_created` can be called standalone, without opening the
+    conference, to check what's needed to join at all and whether there's
+    anyone to join in the first place.
     """
 
     def __init__(
@@ -63,6 +69,8 @@ class JitsiConference:
     ) -> None:
         self.conference_url = conference_url
         self.timeout = timeout
+        self._anonymous_domain = anonymous_domain
+        self._muc_domain = muc_domain
         self._connection = JitsiXmppConnection(
             conference_url,
             nick,
@@ -93,6 +101,36 @@ class JitsiConference:
         """Return the participants currently known to be in the conference."""
         return await self._connection.get_participants()
 
+    async def is_created(self) -> bool:
+        """Return whether this room currently exists, without joining it.
+
+        Jitsi's MUC returns a `forbidden` disco#info error for a room that
+        exists (disco is restricted to occupants) but `item-not-found` for
+        one that hasn't been created yet (or was destroyed once everyone
+        left) - this tells the two apart without joining.
+        """
+        ws_domain, room = parse_conference_url(self.conference_url)
+        xmpp_domain, muc_domain = await resolve_domains(
+            ws_domain, self._anonymous_domain, self._muc_domain, self.timeout
+        )
+        room_jid = f"{room.lower()}@{muc_domain}"
+
+        ws_url = f"wss://{ws_domain}/xmpp-websocket"
+        connect = websockets.connect(
+            ws_url, subprotocols=["xmpp"], open_timeout=self.timeout
+        )
+        async with connect as ws:
+            await _open_authenticated_stream(ws, xmpp_domain, self.timeout)
+            await ws.send(
+                f'<iq xmlns="jabber:client" type="get" to="{room_jid}" id="disco1">'
+                f'<query xmlns="{_NS_DISCO_INFO}"/></iq>'
+            )
+            stanza = await _recv_stanza(ws, self.timeout)
+
+        if stanza.get("type") != "error":
+            return True
+        return _error_condition(stanza) != ROOM_NOT_FOUND
+
     async def diagnose(self) -> DiagnosisResult:
         """Probe the server and report what's needed to read this room's occupancy.
 
@@ -105,15 +143,17 @@ class JitsiConference:
         ws_domain, _ = parse_conference_url(self.conference_url)
         result = DiagnosisResult(ws_domain=ws_domain)
 
+        hosts = {"domain": None, "muc": None, "anonymousdomain": None}
         try:
             hosts = await discover_hosts(ws_domain, timeout=self.timeout)
             result.config_js_reachable = True
             result.discovered_hosts = hosts
-            xmpp_domain = hosts["anonymousdomain"] or hosts["domain"] or ws_domain
         except Exception as exc:  # noqa: BLE001
-            xmpp_domain = ws_domain
             result.error = f"config.js: {exc}"
 
+        xmpp_domain = (
+            self._anonymous_domain or hosts["anonymousdomain"] or hosts["domain"] or ws_domain
+        )
         result.xmpp_domain_tried = xmpp_domain
 
         try:

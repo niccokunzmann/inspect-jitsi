@@ -45,20 +45,54 @@ from websockets.exceptions import ConnectionClosed
 
 from inspect_jitsi.xmpp.participant import Participant
 
-__all__ = ["JitsiXmppConnection", "discover_hosts"]
+__all__ = ["JitsiXmppConnection", "RoomDoesNotExist", "discover_hosts"]
 
 _NS_FRAMING = "urn:ietf:params:xml:ns:xmpp-framing"
 _NS_SASL = "urn:ietf:params:xml:ns:xmpp-sasl"
 _NS_BIND = "urn:ietf:params:xml:ns:xmpp-bind"
 _NS_MUC = "http://jabber.org/protocol/muc"
 _NS_MUC_USER = "http://jabber.org/protocol/muc#user"
+_NS_DISCO_INFO = "http://jabber.org/protocol/disco#info"
 
 FOCUS_NICK = "focus"
 """MUC nickname jicofo always joins under - not a human participant."""
 
+ROOM_CREATION_RESTRICTED = "not-allowed"
+"""XEP-0045 presence error condition for joining a room that doesn't exist
+yet, on a deployment where only privileged users (jicofo) may create rooms -
+i.e. "this room is empty" (or was destroyed once everyone left), not a
+genuine failure.
+"""
+
+ROOM_NOT_FOUND = "item-not-found"
+"""XEP-0045/XEP-0030 error condition a MUC service returns for disco#info on
+a room that doesn't currently exist - as opposed to `forbidden`, which it
+returns for one that exists but restricts disco to occupants.
+"""
+
+
+class RoomDoesNotExist(Exception):
+    """A Jitsi MUC room doesn't exist (yet) and this deployment won't create it.
+
+    Not raised by `JitsiXmppConnection.open()` itself, which instead treats
+    this as an empty room (`room_created` is set to False, with 0
+    participants) rather than an error - this is available for callers that
+    would rather treat "room doesn't exist" as a hard failure.
+    """
+
 
 def _local(tag: str) -> str:
     return tag.split("}", 1)[-1] if "}" in tag else tag
+
+
+def _error_condition(stanza: ET.Element) -> str | None:
+    """Return the XMPP stanza-error condition name (e.g. "not-allowed"), if any."""
+    error = next((child for child in stanza if _local(child.tag) == "error"), None)
+    if error is None:
+        return None
+    return next(
+        (_local(child.tag) for child in error if _local(child.tag) != "text"), None
+    )
 
 
 def parse_conference_url(conference_url: str) -> tuple[str, str]:
@@ -115,6 +149,33 @@ async def discover_hosts(domain: str, timeout: float = 10) -> dict[str, str | No
         response = await session.get(url, timeout=timeout)
         response.raise_for_status()
         return _parse_config_js(response.text)
+
+
+async def resolve_domains(
+    ws_domain: str,
+    anonymous_domain: str | None,
+    muc_domain: str | None,
+    timeout: float,
+) -> tuple[str, str]:
+    """Resolve (xmpp_domain_to_authenticate_as, muc_domain) for a deployment.
+
+    Uses the given overrides where provided, otherwise falls back to
+    `discover_hosts(ws_domain)` (and finally to guesses), so `ws_domain`
+    itself is only used when neither an override nor /config.js gives an
+    answer.
+    """
+    if anonymous_domain is not None and muc_domain is not None:
+        return anonymous_domain, muc_domain
+
+    try:
+        hosts = await discover_hosts(ws_domain, timeout=timeout)
+    except Exception:  # noqa: BLE001
+        hosts = {"domain": None, "muc": None, "anonymousdomain": None}
+
+    xmpp_domain = hosts["domain"] or ws_domain
+    resolved_anonymous = anonymous_domain or hosts["anonymousdomain"] or xmpp_domain
+    resolved_muc = muc_domain or hosts["muc"] or f"conference.{xmpp_domain}"
+    return resolved_anonymous, resolved_muc
 
 
 async def _recv_stanza(ws: websockets.ClientConnection, timeout: float) -> ET.Element:
@@ -199,6 +260,14 @@ class JitsiXmppConnection:
         self._participants: dict[str, Participant] = {}
         self._reader_task: asyncio.Task | None = None
         self._joined = asyncio.Event()
+        self.room_created: bool | None = None
+        """Whether the room existed to join. None before `open()`.
+
+        False means the room didn't exist yet (or was destroyed once
+        everyone left) and this deployment restricts room creation to
+        privileged users (jicofo) - not a genuine failure, just an empty
+        room: `open()` still succeeds, with no participants.
+        """
 
     @property
     def ws(self) -> websockets.ClientConnection:
@@ -214,15 +283,16 @@ class JitsiXmppConnection:
         return self._ws
 
     async def open(self) -> None:
-        """Connect, authenticate anonymously, and join the room's MUC."""
-        if self._anonymous_domain is None or self._muc_domain is None:
-            try:
-                hosts = await discover_hosts(self.ws_domain, timeout=self.timeout)
-            except Exception:  # noqa: BLE001
-                hosts = {"domain": None, "muc": None, "anonymousdomain": None}
-            xmpp_domain = hosts["domain"] or self.ws_domain
-            self._anonymous_domain = self._anonymous_domain or hosts["anonymousdomain"] or xmpp_domain
-            self._muc_domain = self._muc_domain or hosts["muc"] or f"conference.{xmpp_domain}"
+        """Connect, authenticate anonymously, and join the room's MUC.
+
+        If the room doesn't exist yet and this deployment restricts room
+        creation to privileged users, this still succeeds - `room_created`
+        is set to False and the room is treated as empty (no participants),
+        rather than raising.
+        """
+        self._anonymous_domain, self._muc_domain = await resolve_domains(
+            self.ws_domain, self._anonymous_domain, self._muc_domain, self.timeout
+        )
 
         room_jid = f"{self.room.lower()}@{self._muc_domain}"
         self._occupant_jid = f"{room_jid}/{self.nick}"
@@ -247,6 +317,12 @@ class JitsiXmppConnection:
                     if _local(stanza.tag) != "presence":
                         continue
                     if stanza.get("type") == "error":
+                        if _error_condition(stanza) == ROOM_CREATION_RESTRICTED:
+                            # The room doesn't exist and we can't create it -
+                            # i.e. it's empty. We never actually became an
+                            # occupant, so there's nothing to leave on close().
+                            self.room_created = False
+                            break
                         msg = (
                             f"Failed to join room {self._occupant_jid!r}: "
                             f"{ET.tostring(stanza, encoding='unicode')}"
@@ -255,10 +331,12 @@ class JitsiXmppConnection:
                     self._handle_presence(stanza)
                     if _is_self_presence(stanza):
                         self._joined.set()
+                        self.room_created = True
 
             # Keep tracking further roster changes for as long as we stay
-            # connected.
-            self._reader_task = asyncio.ensure_future(self._read_loop())
+            # connected - unless we never actually joined (empty room).
+            if self.room_created:
+                self._reader_task = asyncio.ensure_future(self._read_loop())
         except BaseException:
             await self.close()
             raise
@@ -292,7 +370,10 @@ class JitsiXmppConnection:
         if self._ws is not None:
             ws, self._ws = self._ws, None
             try:
-                if self._occupant_jid is not None:
+                # Only send a leave presence if we actually became an
+                # occupant - room_created is False (or still None, if we
+                # never got as far as sending the join presence at all).
+                if self._occupant_jid is not None and self.room_created:
                     await ws.send(
                         f'<presence xmlns="jabber:client" type="unavailable" '
                         f'to="{self._occupant_jid}"/>'

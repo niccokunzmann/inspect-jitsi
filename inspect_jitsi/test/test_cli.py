@@ -103,3 +103,34 @@ def test_diagnose_prints_json_report(monkeypatch: pytest.MonkeyPatch) -> None:
     report = json.loads(result.stdout)
     assert report["ws_domain"] == "https://meet.example.com/room"
     assert report["anonymous_login_ok"] is True
+
+
+def test_created_exits_0_when_the_room_exists(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cli, "is_room_created", lambda url: True)  # noqa: ARG005
+
+    result = runner.invoke(cli.app, ["created", "https://meet.example.com/room"])
+
+    assert result.exit_code == 0
+    assert result.output == ""
+
+
+def test_created_exits_1_when_the_room_does_not_exist(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cli, "is_room_created", lambda url: False)  # noqa: ARG005
+
+    result = runner.invoke(cli.app, ["created", "https://meet.example.com/room"])
+
+    assert result.exit_code == 1
+    assert result.output == ""
+
+
+def test_created_exits_2_on_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    def failing_is_room_created(_url: str) -> bool:
+        msg = "boom"
+        raise RuntimeError(msg)
+
+    monkeypatch.setattr(cli, "is_room_created", failing_is_room_created)
+
+    result = runner.invoke(cli.app, ["created", "https://meet.example.com/room"])
+
+    assert result.exit_code == 2  # noqa: PLR2004
+    assert "boom" in result.output

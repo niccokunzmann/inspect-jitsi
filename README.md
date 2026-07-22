@@ -108,8 +108,3 @@ pip install -e ".[test]"  # + test dependencies (pytest, pytest-asyncio, ...)
 ```sh
 pytest
 ```
-
-None of the tests talk to a real Jitsi server - they drive
-`JitsiXmppConnection`/`JitsiConference` against a scripted fake WebSocket
-server (see `inspect_jitsi/test/conftest.py`), fed canned XMPP stanzas
-recorded from real traffic against a docker-jitsi-meet deployment.

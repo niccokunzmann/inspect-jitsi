@@ -24,6 +24,7 @@ from inspect_jitsi.test.conftest import (
     error_presence,
     handshake_script,
     join_script,
+    room_creation_restricted_presence,
     sasl_failure,
     stream_features_mechanisms,
     stream_open,
@@ -115,3 +116,28 @@ async def test_anonymous_login_rejected_raises_connection_error(fake_server) -> 
     conn = make_connection()
     with pytest.raises(ConnectionError, match="rejected"):
         await conn.open()
+
+
+async def test_room_does_not_exist_counts_zero_without_raising(fake_server) -> None:
+    """Joining a room that doesn't exist, where creation is restricted, is an
+    empty room - not an error (see connection.py's ROOM_CREATION_RESTRICTED)."""
+    ws = fake_server([*handshake_script(), room_creation_restricted_presence(NICK)])
+
+    conn = make_connection()
+    await conn.open()  # must not raise
+    try:
+        assert conn.room_created is False
+        assert await conn.get_participants() == []
+        assert await conn.get_participant_count() == 0
+    finally:
+        await conn.close()
+
+    # We never actually became an occupant, so there's nothing to leave.
+    assert not any('type="unavailable"' in s for s in ws.sent)
+
+
+async def test_room_created_is_true_after_a_normal_join(fake_server) -> None:
+    fake_server([*handshake_script(), *join_script(NICK)])
+
+    async with make_connection() as conn:
+        assert conn.room_created is True
