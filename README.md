@@ -125,3 +125,13 @@ pip install -e ".[test]"  # + test dependencies
 ```sh
 pytest
 ```
+
+## Release
+
+1. Edit the changelog
+2. Create a tag and push it.
+
+```sh
+git tag v0.0.1
+git push origin v0.0.1
+```
