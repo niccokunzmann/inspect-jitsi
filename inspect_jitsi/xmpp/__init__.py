@@ -15,13 +15,18 @@
 from __future__ import annotations
 
 from inspect_jitsi.xmpp.conference import JitsiConference
-from inspect_jitsi.xmpp.connection import JitsiXmppConnection, discover_hosts
+from inspect_jitsi.xmpp.connection import (
+    JitsiConnectionError,
+    JitsiXmppConnection,
+    discover_hosts,
+)
 from inspect_jitsi.xmpp.diagnosis import DiagnosisResult
 from inspect_jitsi.xmpp.participant import Participant
 
 __all__ = [
     "DiagnosisResult",
     "JitsiConference",
+    "JitsiConnectionError",
     "JitsiXmppConnection",
     "Participant",
     "discover_hosts",

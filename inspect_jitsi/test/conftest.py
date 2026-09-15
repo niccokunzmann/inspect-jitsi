@@ -53,6 +53,18 @@ def stream_features_mechanisms() -> str:
     )
 
 
+def stream_features_mechanisms_unbound_prefix() -> str:
+    """Same as `stream_features_mechanisms`, but missing `xmlns:stream` -
+    some real deployments send it this way over the WebSocket framing,
+    which has no enclosing `<stream:stream>` to inherit the binding from."""
+    return (
+        "<stream:features xmlns='jabber:client'>"
+        "<mechanisms xmlns='urn:ietf:params:xml:ns:xmpp-sasl'>"
+        "<mechanism>ANONYMOUS</mechanism>"
+        "</mechanisms></stream:features>"
+    )
+
+
 def stream_features_no_anonymous() -> str:
     return (
         "<stream:features xmlns:stream='http://etherx.jabber.org/streams' xmlns='jabber:client'>"
@@ -182,9 +194,10 @@ def join_script(nick: str, other_occupants: tuple[str, ...] = (), *, include_foc
 class FakeWebSocket:
     """A minimal stand-in for a `websockets` connection, fed by a fixed script.
 
-    `recv()` returns the next scripted message; once the script is
-    exhausted, it waits forever (so a background reader task just idles,
-    like a real quiet connection) until cancelled.
+    `recv()` returns the next scripted message, or raises it if it's an
+    exception instance (to simulate a dropped connection mid-script); once
+    the script is exhausted, it waits forever (so a background reader task
+    just idles, like a real quiet connection) until cancelled.
     """
 
     def __init__(self, script: list[str]) -> None:
@@ -197,7 +210,10 @@ class FakeWebSocket:
 
     async def recv(self) -> str:
         if self._script:
-            return self._script.pop(0)
+            item = self._script.pop(0)
+            if isinstance(item, BaseException):
+                raise item
+            return item
         await asyncio.Event().wait()  # idle forever, like a quiet real connection
         raise AssertionError  # pragma: no cover - unreachable
 

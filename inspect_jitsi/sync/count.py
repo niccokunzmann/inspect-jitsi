@@ -67,6 +67,11 @@ def get_participant_count(
         Number of people already in the room, not counting this probe
         (0 if the room is empty).
 
+    Raises:
+        inspect_jitsi.xmpp.JitsiConnectionError: the XMPP connection failed
+            or was lost (refused, dropped, timed out, or an unparseable
+            server response).
+
     """
     return asyncio.run(
         _get_participant_count_async(conference_url, nick, anonymous_domain, muc_domain, timeout)

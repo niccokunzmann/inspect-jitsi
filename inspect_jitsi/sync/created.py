@@ -41,6 +41,12 @@ def is_room_created(
             or "conference.example.com"). Auto-discovered if not given.
         timeout: seconds to wait for each network step.
 
+    Raises:
+        inspect_jitsi.xmpp.JitsiConnectionError: the XMPP connection failed
+            or was lost (refused, dropped, timed out, or an unparseable
+            server response) - not raised for a room that simply doesn't
+            exist, which is reported as `False`.
+
     """
     conference = JitsiConference(
         conference_url,

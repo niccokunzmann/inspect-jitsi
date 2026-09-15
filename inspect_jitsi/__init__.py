@@ -23,6 +23,7 @@ from inspect_jitsi.sync import (
 from inspect_jitsi.xmpp import (
     DiagnosisResult,
     JitsiConference,
+    JitsiConnectionError,
     JitsiXmppConnection,
     Participant,
     discover_hosts,
@@ -31,6 +32,7 @@ from inspect_jitsi.xmpp import (
 __all__ = [
     "DiagnosisResult",
     "JitsiConference",
+    "JitsiConnectionError",
     "JitsiXmppConnection",
     "Participant",
     "diagnose_jitsi_access",

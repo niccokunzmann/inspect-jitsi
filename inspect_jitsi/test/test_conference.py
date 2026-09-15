@@ -14,20 +14,27 @@
 
 from __future__ import annotations
 
+import pytest
+from websockets.exceptions import ConnectionClosedError
+
 from inspect_jitsi.test.conftest import (
     CONFERENCE_URL,
     MUC_DOMAIN,
     ROOM_JID,
     XMPP_DOMAIN,
+    bind_result,
     forbidden_disco_error,
     handshake_script,
     join_script,
     room_not_found_disco_error,
     sasl_failure,
+    sasl_success,
+    stream_features_bind,
     stream_features_mechanisms,
+    stream_features_mechanisms_unbound_prefix,
     stream_open,
 )
-from inspect_jitsi.xmpp import JitsiConference
+from inspect_jitsi.xmpp import JitsiConference, JitsiConnectionError
 from inspect_jitsi.xmpp.diagnosis import DiagnosisResult
 
 NICK = "probe-test"
@@ -101,3 +108,34 @@ async def test_is_created_does_not_join(fake_server) -> None:
     await conference.is_created()
 
     assert not any("<presence" in s and "muc" in s.lower() for s in ws.sent)
+
+
+async def test_is_created_tolerates_missing_xmlns_stream(fake_server) -> None:
+    """Regression test matching a real crash report: a deployment sending
+    <stream:features> without xmlns:stream over the WebSocket framing used
+    to blow up is_created() with a raw xml.etree.ElementTree.ParseError
+    ("unbound prefix") instead of returning normally."""
+    fake_server(
+        [
+            stream_open(),
+            stream_features_mechanisms_unbound_prefix(),
+            sasl_success(),
+            stream_open(),
+            stream_features_bind(),
+            bind_result(),
+            forbidden_disco_error(),
+        ]
+    )
+
+    conference = make_conference()
+    assert await conference.is_created() is True
+
+
+async def test_is_created_raises_jitsi_connection_error_on_dropped_connection(fake_server) -> None:
+    """A transport failure during is_created() must surface as this
+    library's own exception type, not a raw `websockets` exception."""
+    fake_server([stream_open(), ConnectionClosedError(None, None)])
+
+    conference = make_conference()
+    with pytest.raises(JitsiConnectionError):
+        await conference.is_created()

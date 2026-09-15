@@ -2,6 +2,25 @@
 
 Tools for inspecting a running [Jitsi Meet](https://jitsi.org/) deployment.
 
+- [Changelog](CHANGED.md)
+- [PyPI](https://pypi.org/project/inspect-jitsi/)
+- [Source](https://github.com/niccokunzmann/inspect-jitsi)
+
+## Installation
+
+Install the `inspect-jitsi` command with [pipx](https://pipx.pypa.io/latest/index.html):
+
+```sh
+pipx install inspect-jitsi[cli]
+```
+
+Install as a Python module only:
+
+```sh
+pip install inspect-jitsi
+```
+
+
 ## Command Line API
 
 The command line requires installing `inspect-jitsi[cli]`.

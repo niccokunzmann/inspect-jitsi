@@ -16,20 +16,26 @@ from __future__ import annotations
 
 import pytest
 
+from websockets.exceptions import ConnectionClosedError
+
 from inspect_jitsi.test.conftest import (
     CONFERENCE_URL,
     MUC_DOMAIN,
     ROOM_JID,
     XMPP_DOMAIN,
+    bind_result,
     error_presence,
     handshake_script,
     join_script,
     room_creation_restricted_presence,
     sasl_failure,
+    sasl_success,
+    stream_features_bind,
     stream_features_mechanisms,
+    stream_features_mechanisms_unbound_prefix,
     stream_open,
 )
-from inspect_jitsi.xmpp import JitsiXmppConnection
+from inspect_jitsi.xmpp import JitsiConnectionError, JitsiXmppConnection
 
 NICK = "probe-test"
 
@@ -141,3 +147,48 @@ async def test_room_created_is_true_after_a_normal_join(fake_server) -> None:
 
     async with make_connection() as conn:
         assert conn.room_created is True
+
+
+async def test_stream_features_missing_xmlns_stream_is_repaired(fake_server) -> None:
+    """Regression test for a real-world quirk: some deployments send
+    <stream:features> over the WebSocket framing without redeclaring
+    xmlns:stream (there's no enclosing <stream:stream> for it to inherit
+    the binding from, unlike plain RFC 6120 TCP). This used to blow up
+    ET.fromstring with "unbound prefix" and crash the caller - it must
+    instead be parsed transparently, like a normal join."""
+    fake_server(
+        [
+            stream_open(),
+            stream_features_mechanisms_unbound_prefix(),
+            sasl_success(),
+            stream_open(),
+            stream_features_bind(),
+            bind_result(),
+            *join_script(NICK),
+        ]
+    )
+
+    async with make_connection() as conn:
+        assert conn.room_created is True
+
+
+async def test_dropped_connection_raises_jitsi_connection_error(fake_server) -> None:
+    """A WebSocket dropping mid-handshake must surface as the library's own
+    exception type, not a raw `websockets` exception the caller has to know
+    to catch."""
+    fake_server([stream_open(), ConnectionClosedError(None, None)])
+
+    conn = make_connection()
+    with pytest.raises(JitsiConnectionError):
+        await conn.open()
+
+
+async def test_unparseable_stanza_raises_jitsi_connection_error(fake_server) -> None:
+    """Genuinely malformed XML (not the missing-xmlns:stream quirk) must
+    still raise the library's own exception type instead of a raw
+    xml.etree.ElementTree.ParseError."""
+    fake_server([stream_open(), "<this is not valid xml"])
+
+    conn = make_connection()
+    with pytest.raises(JitsiConnectionError):
+        await conn.open()

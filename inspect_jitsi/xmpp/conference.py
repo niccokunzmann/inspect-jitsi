@@ -28,7 +28,9 @@ from inspect_jitsi.xmpp.connection import (
     _NS_DISCO_INFO,
     _NS_FRAMING,
     _NS_SASL,
+    _TRANSPORT_ERRORS,
     ROOM_NOT_FOUND,
+    JitsiConnectionError,
     JitsiXmppConnection,
     _error_condition,
     _local,
@@ -108,6 +110,12 @@ class JitsiConference:
         exists (disco is restricted to occupants) but `item-not-found` for
         one that hasn't been created yet (or was destroyed once everyone
         left) - this tells the two apart without joining.
+
+        Raises:
+            JitsiConnectionError: the XMPP connection failed or was lost
+                (refused, dropped, timed out, or an unparseable server
+                response) - not raised for a room that simply doesn't
+                exist, which is reported as `False`.
         """
         ws_domain, room = parse_conference_url(self.conference_url)
         xmpp_domain, muc_domain = await resolve_domains(
@@ -119,13 +127,19 @@ class JitsiConference:
         connect = websockets.connect(
             ws_url, subprotocols=["xmpp"], open_timeout=self.timeout
         )
-        async with connect as ws:
-            await _open_authenticated_stream(ws, xmpp_domain, self.timeout)
-            await ws.send(
-                f'<iq xmlns="jabber:client" type="get" to="{room_jid}" id="disco1">'
-                f'<query xmlns="{_NS_DISCO_INFO}"/></iq>'
-            )
-            stanza = await _recv_stanza(ws, self.timeout)
+        try:
+            async with connect as ws:
+                await _open_authenticated_stream(ws, xmpp_domain, self.timeout)
+                await ws.send(
+                    f'<iq xmlns="jabber:client" type="get" to="{room_jid}" id="disco1">'
+                    f'<query xmlns="{_NS_DISCO_INFO}"/></iq>'
+                )
+                stanza = await _recv_stanza(ws, self.timeout)
+        except JitsiConnectionError:
+            raise
+        except _TRANSPORT_ERRORS as exc:
+            msg = f"Could not check whether {self.conference_url!r} exists: {exc}"
+            raise JitsiConnectionError(msg) from exc
 
         if stanza.get("type") != "error":
             return True

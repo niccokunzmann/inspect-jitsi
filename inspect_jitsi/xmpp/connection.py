@@ -41,11 +41,16 @@ from urllib.parse import urlparse
 
 import niquests
 import websockets
-from websockets.exceptions import ConnectionClosed
+from websockets.exceptions import ConnectionClosed, WebSocketException
 
 from inspect_jitsi.xmpp.participant import Participant
 
-__all__ = ["JitsiXmppConnection", "RoomDoesNotExist", "discover_hosts"]
+__all__ = [
+    "JitsiConnectionError",
+    "JitsiXmppConnection",
+    "RoomDoesNotExist",
+    "discover_hosts",
+]
 
 _NS_FRAMING = "urn:ietf:params:xml:ns:xmpp-framing"
 _NS_SASL = "urn:ietf:params:xml:ns:xmpp-sasl"
@@ -53,6 +58,12 @@ _NS_BIND = "urn:ietf:params:xml:ns:xmpp-bind"
 _NS_MUC = "http://jabber.org/protocol/muc"
 _NS_MUC_USER = "http://jabber.org/protocol/muc#user"
 _NS_DISCO_INFO = "http://jabber.org/protocol/disco#info"
+_NS_STREAM = "http://etherx.jabber.org/streams"
+
+# Anything a live WebSocket/XMPP round trip can raise below the
+# room-existence/roster level: a dropped or refused connection, a timeout,
+# or a server response this hand-rolled client can't parse.
+_TRANSPORT_ERRORS = (OSError, TimeoutError, WebSocketException, ET.ParseError)
 
 FOCUS_NICK = "focus"
 """MUC nickname jicofo always joins under - not a human participant."""
@@ -78,6 +89,19 @@ class RoomDoesNotExist(Exception):
     this as an empty room (`room_created` is set to False, with 0
     participants) rather than an error - this is available for callers that
     would rather treat "room doesn't exist" as a hard failure.
+    """
+
+
+class JitsiConnectionError(ConnectionError):
+    """Talking to a Jitsi deployment's XMPP endpoint failed or was lost.
+
+    Covers everything below the room-existence/participant-roster level -
+    the WebSocket connection being refused, dropped, or timing out, and a
+    server response this hand-rolled client can't parse - as well as the
+    protocol-level rejections (stream errors, failed SASL, a failed MUC
+    join) this module raises as it negotiates a session. Catch this (or the
+    plain `ConnectionError` it subclasses) instead of guessing at every
+    stdlib/`websockets` exception a live XMPP session might raise.
     """
 
 
@@ -178,10 +202,44 @@ async def resolve_domains(
     return resolved_anonymous, resolved_muc
 
 
+_STANDALONE_STREAM_TAG_RE = re.compile(r"^<stream:(\w+)([^>]*)>")
+
+
+def _repair_unbound_stream_prefix(message: str) -> str:
+    """Rebind a bare stanza's "stream:" prefix, if it doesn't declare one.
+
+    RFC 7395 WebSocket framing sends each stanza as its own standalone XML
+    document - there's no enclosing `<stream:stream>` for a bare
+    `<stream:features>` or `<stream:error>` to inherit a namespace binding
+    from - but some servers still omit the `xmlns:stream` declaration they
+    would only need to redeclare under the RFC 6120 TCP framing this was
+    adapted from, which `ET.fromstring` then rejects as an unbound prefix.
+    """
+    if "xmlns:stream=" in message:
+        return message
+    match = _STANDALONE_STREAM_TAG_RE.match(message)
+    if match is None:
+        return message
+    tag, rest = match.group(1), match.group(2)
+    return f'<stream:{tag} xmlns:stream="{_NS_STREAM}"{rest}>{message[match.end():]}'
+
+
 async def _recv_stanza(ws: websockets.ClientConnection, timeout: float) -> ET.Element:
-    async with asyncio.timeout(timeout):
-        message = await ws.recv()
-    return ET.fromstring(message)
+    try:
+        async with asyncio.timeout(timeout):
+            message = await ws.recv()
+    except (TimeoutError, WebSocketException, OSError) as exc:
+        msg = f"Lost the XMPP connection while waiting for a reply: {exc}"
+        raise JitsiConnectionError(msg) from exc
+
+    try:
+        return ET.fromstring(message)
+    except ET.ParseError:
+        try:
+            return ET.fromstring(_repair_unbound_stream_prefix(message))
+        except ET.ParseError as exc:
+            msg = f"Could not parse a reply from the server: {message!r}"
+            raise JitsiConnectionError(msg) from exc
 
 
 def _is_self_presence(presence: ET.Element) -> bool:
@@ -201,7 +259,7 @@ async def _open_authenticated_stream(
     opened = await _recv_stanza(ws, timeout)
     if _local(opened.tag) == "error":
         msg = f"Stream error opening to {xmpp_domain!r}: {ET.tostring(opened, encoding='unicode')}"
-        raise ConnectionError(msg)
+        raise JitsiConnectionError(msg)
     await _recv_stanza(ws, timeout)  # <stream:features>
 
     await ws.send(f'<auth xmlns="{_NS_SASL}" mechanism="ANONYMOUS"/>')
@@ -211,7 +269,7 @@ async def _open_authenticated_stream(
             f"Anonymous XMPP login to {xmpp_domain!r} was rejected: "
             f"{ET.tostring(result, encoding='unicode')}"
         )
-        raise ConnectionError(msg)
+        raise JitsiConnectionError(msg)
 
     # Restart the stream post-auth, as required by RFC 6120.
     await ws.send(f'<open xmlns="{_NS_FRAMING}" to="{xmpp_domain}" version="1.0"/>')
@@ -298,7 +356,13 @@ class JitsiXmppConnection:
         self._occupant_jid = f"{room_jid}/{self.nick}"
 
         ws_url = f"wss://{self.ws_domain}/xmpp-websocket"
-        self._ws = await websockets.connect(ws_url, subprotocols=["xmpp"], open_timeout=self.timeout)
+        try:
+            self._ws = await websockets.connect(
+                ws_url, subprotocols=["xmpp"], open_timeout=self.timeout
+            )
+        except _TRANSPORT_ERRORS as exc:
+            msg = f"Could not open a WebSocket connection to {ws_url!r}: {exc}"
+            raise JitsiConnectionError(msg) from exc
         try:
             await _open_authenticated_stream(self.ws, self._anonymous_domain, self.timeout)
 
@@ -327,7 +391,7 @@ class JitsiXmppConnection:
                             f"Failed to join room {self._occupant_jid!r}: "
                             f"{ET.tostring(stanza, encoding='unicode')}"
                         )
-                        raise ConnectionError(msg)
+                        raise JitsiConnectionError(msg)
                     self._handle_presence(stanza)
                     if _is_self_presence(stanza):
                         self._joined.set()
@@ -337,6 +401,13 @@ class JitsiXmppConnection:
             # connected - unless we never actually joined (empty room).
             if self.room_created:
                 self._reader_task = asyncio.ensure_future(self._read_loop())
+        except JitsiConnectionError:
+            await self.close()
+            raise
+        except _TRANSPORT_ERRORS as exc:
+            await self.close()
+            msg = f"Lost the XMPP connection while joining {self._occupant_jid!r}: {exc}"
+            raise JitsiConnectionError(msg) from exc
         except BaseException:
             await self.close()
             raise
