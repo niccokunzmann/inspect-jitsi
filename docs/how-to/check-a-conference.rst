@@ -2,19 +2,10 @@
 Check a Jitsi conference from the command line
 ==============================================
 
-This walks through inspecting a running Jitsi Meet conference with the ``inspect-jitsi`` command, from installation to reading its output. It uses ``https://meet.hosted.quelltext.eu/inspect-jitsi`` as the example room throughout - substitute your own conference's URL everywhere it appears.
+This walks through inspecting a running Jitsi Meet conference with the ``inspect-jitsi`` command (see :doc:`../installation` if you haven't installed it yet). It uses https://meet.hosted.quelltext.eu/inspect-jitsi as the example room throughout - substitute your own conference's URL everywhere it appears or use it to try out the command.
 
-1. Install the command
--------------------------
-
-.. code-block:: shell
-
-    pipx install "inspect-jitsi[cli]"
-
-See :doc:`../installation` for other installation methods.
-
-2. Count the participants
-----------------------------
+Count the participants
+-----------------------
 
 .. code-block:: shell
 
@@ -28,8 +19,8 @@ Prints a single number - how many people are already in the room, not counting t
 
 An empty (or nonexistent) room prints ``0`` rather than failing.
 
-3. List who is in it
-------------------------
+List all participants
+---------------------
 
 .. code-block:: shell
 
@@ -51,12 +42,12 @@ Prints the same roster as indented JSON, one entry per participant:
       }
     ]
 
-``name`` is only present if that participant's own client disclosed a display name (XEP-0172) - it is ``null`` otherwise, even though ``nick`` (the technical MUC nickname) is always known. See :doc:`../reference/index` for what each field means.
+``name`` is only present if that participant's own client disclosed a display name (XEP-0172) - it is ``null`` otherwise, even though ``nick`` (the technical MUC nickname) is always known. See :doc:`../reference/participant-fields` for what every field means.
 
-4. Check whether the room exists, without joining
-------------------------------------------------------
+Check whether the room exists, without joining
+----------------------------------------------
 
-``count``/``participants`` briefly join the room to read its roster (see :doc:`../reference/index` for why), which other participants may notice as a transient join/leave. To check only whether a room currently exists, without joining it at all:
+``count``/``participants`` briefly join the room to read its roster (see :doc:`../reference/how-it-works` for why), which other participants may notice as a transient join/leave. To check only whether a room currently exists, without joining it at all:
 
 .. code-block:: shell
 
@@ -72,8 +63,8 @@ This prints nothing - it only sets its exit code (``0`` if the room exists, ``1`
 
     true
 
-5. Diagnose a failure
--------------------------
+Diagnose a failure
+------------------
 
 If ``count`` or ``participants`` can't reach the room at all - a token being required, an unreachable deployment, disallowed anonymous login - they print an error and automatically fall back to running diagnostics, so you do not need to run this by hand:
 
@@ -100,8 +91,8 @@ To run the same report on its own at any time:
 
 ``anonymous_login_ok: false`` most often means the deployment requires a JWT/token to join, which ``inspect-jitsi`` cannot supply.
 
-6. Choose the name inspect-jitsi joins under
-------------------------------------------------
+Choose the participant name inspect-jitsi uses
+----------------------------------------------
 
 ``count``/``participants`` disclose a display name to other participants while briefly joined - by default, ``"inspect-jitsi"``, so it is recognizable in the room's participant list rather than showing up as Jitsi's generic "Fellow Jitsier". Override it with ``--name``, or the ``INSPECT_JITSI_NAME`` environment variable for every invocation in a shell session or script:
 
