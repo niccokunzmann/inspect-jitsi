@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Add a `name` option (CLI `--name`, `INSPECT_JITSI_NAME` environment
+  variable, and `name=` on `get_participant_count`/`get_participants`/
+  `JitsiConference`/`JitsiXmppConnection`) to set the display name disclosed
+  when joining a room - defaults to `"inspect-jitsi"` instead of Jitsi's own
+  "Fellow Jitsier" fallback for occupants with no display name.
+
 ## 0.0.2
 
 - Fix: tolerate `<stream:features>`/`<stream:error>` sent without an

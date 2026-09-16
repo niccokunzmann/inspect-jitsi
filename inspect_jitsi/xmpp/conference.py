@@ -65,6 +65,7 @@ class JitsiConference:
         conference_url: str,
         nick: str | None = None,
         *,
+        name: str | None = None,
         anonymous_domain: str | None = None,
         muc_domain: str | None = None,
         timeout: float = 10,
@@ -76,6 +77,7 @@ class JitsiConference:
         self._connection = JitsiXmppConnection(
             conference_url,
             nick,
+            name=name,
             anonymous_domain=anonymous_domain,
             muc_domain=muc_domain,
             timeout=timeout,
@@ -90,6 +92,11 @@ class JitsiConference:
     def nick(self) -> str:
         """The MUC nickname this conference is (or will be) joined under."""
         return self._connection.nick
+
+    @property
+    def name(self) -> str:
+        """The display name (XEP-0172) disclosed when joining."""
+        return self._connection.name
 
     async def open(self) -> None:
         """Connect and join the conference."""

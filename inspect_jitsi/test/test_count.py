@@ -48,6 +48,22 @@ def test_get_participant_count_empty_room(fake_server) -> None:
     assert count == 0
 
 
+def test_get_participant_count_discloses_a_custom_display_name(fake_server) -> None:
+    ws = fake_server([*handshake_script(), *join_script(NICK)])
+
+    get_participant_count(
+        CONFERENCE_URL,
+        NICK,
+        name="Alice",
+        anonymous_domain=XMPP_DOMAIN,
+        muc_domain=MUC_DOMAIN,
+        timeout=1,
+    )
+
+    join_presence = next(s for s in ws.sent if "<x xmlns=" in s)
+    assert '<nick xmlns="http://jabber.org/protocol/nick">Alice</nick>' in join_presence
+
+
 def test_get_participant_count_with_random_nick(
     monkeypatch: pytest.MonkeyPatch, fake_server
 ) -> None:

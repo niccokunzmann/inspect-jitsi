@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
+
 import pytest
 
 from websockets.exceptions import ConnectionClosedError
@@ -78,6 +80,40 @@ async def test_open_counts_only_humans(fake_server) -> None:
 
     assert any("type=\"unavailable\"" in s for s in ws.sent)
     assert ws.closed
+
+
+async def test_join_presence_discloses_default_display_name(fake_server) -> None:
+    """Without an explicit `name`, the join presence discloses "inspect-jitsi"
+    as the XEP-0172 display name, rather than none at all (which Jitsi's web
+    client shows to others as the generic "Fellow Jitsier")."""
+    ws = fake_server([*handshake_script(), *join_script(NICK)])
+
+    async with make_connection() as conn:
+        assert conn.name == "inspect-jitsi"
+
+    join_presence = next(s for s in ws.sent if "<x xmlns=" in s)
+    assert '<nick xmlns="http://jabber.org/protocol/nick">inspect-jitsi</nick>' in join_presence
+
+
+async def test_join_presence_discloses_a_custom_display_name(fake_server) -> None:
+    ws = fake_server([*handshake_script(), *join_script(NICK)])
+
+    async with make_connection(name="Alice") as conn:
+        assert conn.name == "Alice"
+
+    join_presence = next(s for s in ws.sent if "<x xmlns=" in s)
+    assert '<nick xmlns="http://jabber.org/protocol/nick">Alice</nick>' in join_presence
+
+
+async def test_join_presence_escapes_a_display_name_with_xml_special_characters(fake_server) -> None:
+    ws = fake_server([*handshake_script(), *join_script(NICK)])
+
+    async with make_connection(name="<Alice> & Bob"):
+        pass
+
+    join_presence = next(s for s in ws.sent if "<x xmlns=" in s)
+    assert "&lt;Alice&gt; &amp; Bob" in join_presence
+    assert ET.fromstring(join_presence) is not None
 
 
 async def test_empty_room_counts_zero(fake_server) -> None:

@@ -14,6 +14,10 @@
 
 ``inspect-jitsi count|participants|diagnose|created <conference-url>``.
 Requires the "cli" extra: ``pip install inspect-jitsi[cli]``.
+
+``count``/``participants`` join the room under a display name, set via
+``--name``, the ``INSPECT_JITSI_NAME`` environment variable, or defaulting
+to "inspect-jitsi".
 """
 
 from __future__ import annotations
@@ -39,6 +43,13 @@ app = typer.Typer(
     help="Tools for inspecting a running Jitsi Meet deployment.",
 )
 
+NameOption = typer.Option(
+    "inspect-jitsi",
+    "--name",
+    envvar="INSPECT_JITSI_NAME",
+    help="Display name to disclose when joining the room.",
+)
+
 
 def _fail(action: str, conference_url: str, exc: Exception) -> None:
     typer.echo(f"Failed to {action}: {exc}", err=True)
@@ -48,19 +59,19 @@ def _fail(action: str, conference_url: str, exc: Exception) -> None:
 
 
 @app.command()
-def count(conference_url: str) -> None:
+def count(conference_url: str, name: str = NameOption) -> None:
     """Print the number of participants currently in a Jitsi Meet room."""
     try:
-        typer.echo(get_participant_count(conference_url))
+        typer.echo(get_participant_count(conference_url, name=name))
     except Exception as exc:  # noqa: BLE001
         _fail("get participant count", conference_url, exc)
 
 
 @app.command()
-def participants(conference_url: str) -> None:
+def participants(conference_url: str, name: str = NameOption) -> None:
     """Print the participants currently in a Jitsi Meet room, as indented JSON."""
     try:
-        people = get_participants(conference_url)
+        people = get_participants(conference_url, name=name)
     except Exception as exc:  # noqa: BLE001
         _fail("get participants", conference_url, exc)
         return

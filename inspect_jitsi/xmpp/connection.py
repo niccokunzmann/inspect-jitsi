@@ -38,6 +38,7 @@ import re
 import uuid
 import xml.etree.ElementTree as ET
 from urllib.parse import urlparse
+from xml.sax.saxutils import escape
 
 import niquests
 import websockets
@@ -57,6 +58,7 @@ _NS_SASL = "urn:ietf:params:xml:ns:xmpp-sasl"
 _NS_BIND = "urn:ietf:params:xml:ns:xmpp-bind"
 _NS_MUC = "http://jabber.org/protocol/muc"
 _NS_MUC_USER = "http://jabber.org/protocol/muc#user"
+_NS_NICK = "http://jabber.org/protocol/nick"
 _NS_DISCO_INFO = "http://jabber.org/protocol/disco#info"
 _NS_STREAM = "http://etherx.jabber.org/streams"
 
@@ -67,6 +69,15 @@ _TRANSPORT_ERRORS = (OSError, TimeoutError, WebSocketException, ET.ParseError)
 
 FOCUS_NICK = "focus"
 """MUC nickname jicofo always joins under - not a human participant."""
+
+DEFAULT_NAME = "inspect-jitsi"
+"""Display name (XEP-0172 <nick/>) used to join a room when none is given.
+
+Jitsi's own web client falls back to showing "Fellow Jitsier" for an
+occupant that discloses no display name at all - sending this instead makes
+it clear in the room's participant list that the join was this tool
+inspecting the room, not a person.
+"""
 
 ROOM_CREATION_RESTRICTED = "not-allowed"
 """XEP-0045 presence error condition for joining a room that doesn't exist
@@ -285,9 +296,10 @@ class JitsiXmppConnection:
     """An anonymous XMPP/MUC connection, joined to one Jitsi Meet room.
 
     Connects over the WebSocket endpoint the Jitsi web client itself uses,
-    joins the room's MUC under the given nickname, and keeps a live roster
-    of the other participants (updated as they join/leave for as long as
-    the connection stays open).
+    joins the room's MUC under the given nickname (disclosing `name` as its
+    XEP-0172 display name), and keeps a live roster of the other
+    participants (updated as they join/leave for as long as the connection
+    stays open).
 
     Use as an async context manager::
 
@@ -302,6 +314,7 @@ class JitsiXmppConnection:
         conference_url: str,
         nick: str | None = None,
         *,
+        name: str | None = None,
         anonymous_domain: str | None = None,
         muc_domain: str | None = None,
         timeout: float = 10,
@@ -309,6 +322,7 @@ class JitsiXmppConnection:
         self.conference_url = conference_url
         self.ws_domain, self.room = parse_conference_url(conference_url)
         self.nick = nick or f"inspect-jitsi-{uuid.uuid4().hex[:8]}"
+        self.name = name or DEFAULT_NAME
         self.timeout = timeout
         self._anonymous_domain = anonymous_domain
         self._muc_domain = muc_domain
@@ -368,7 +382,9 @@ class JitsiXmppConnection:
 
             await self.ws.send(
                 f'<presence xmlns="jabber:client" to="{self._occupant_jid}">'
-                f'<x xmlns="{_NS_MUC}"/></presence>'
+                f'<x xmlns="{_NS_MUC}"/>'
+                f'<nick xmlns="{_NS_NICK}">{escape(self.name)}</nick>'
+                "</presence>"
             )
 
             # Read the initial roster inline, so a failure to join (e.g. a

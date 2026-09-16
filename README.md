@@ -46,6 +46,16 @@ inspect-jitsi created https://meet.hosted.quelltext.eu/inspect-jitsi
 `count`/`participants` fall back to running `diagnose` and printing its report
 to stderr if they fail, to help explain why (e.g. a token being required).
 
+`count`/`participants` join the room briefly (see "How it works" below) and
+disclose a display name to other participants while doing so. Set it with
+`--name`, the `INSPECT_JITSI_NAME` environment variable, or leave it unset to
+default to `"inspect-jitsi"`:
+
+```sh
+inspect-jitsi count --name "Room Monitor" https://meet.hosted.quelltext.eu/inspect-jitsi
+INSPECT_JITSI_NAME="Room Monitor" inspect-jitsi count https://meet.hosted.quelltext.eu/inspect-jitsi
+```
+
 ## Python API (Sync)
 
 ```python
@@ -64,8 +74,8 @@ is_room_created("https://meet.example.com/SomeRoomName")         # -> True
 
 | Function | Returns |
 | --- | --- |
-| `get_participant_count(url, nick=None, ...)` | `int` |
-| `get_participants(url, nick=None, ...)` | `list[Participant]` |
+| `get_participant_count(url, nick=None, name=None, ...)` | `int` |
+| `get_participants(url, nick=None, name=None, ...)` | `list[Participant]` |
 | `diagnose_jitsi_access(url, ...)` | `DiagnosisResult` |
 | `is_room_created(url, ...)` | `bool` |
 
@@ -73,6 +83,10 @@ is_room_created("https://meet.example.com/SomeRoomName")         # -> True
 `Participant` also has `.to_json()`) for easy serialization. `Participant`
 carries `jid`, `nick`, `name` (display name, if disclosed), `role`,
 `affiliation`, `real_jid`, and `occupant_id`.
+
+`name` is the display name *this* tool discloses to others while briefly
+joined - it defaults to `"inspect-jitsi"` (Jitsi's own web client would
+otherwise show it to others as the generic "Fellow Jitsier").
 
 ## Python API (Async)
 
