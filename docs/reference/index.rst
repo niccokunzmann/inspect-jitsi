@@ -7,4 +7,5 @@ Reference
 
     cli
     api/inspect_jitsi
+    how-it-works
     changelog

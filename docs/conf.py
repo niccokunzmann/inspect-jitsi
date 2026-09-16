@@ -59,6 +59,10 @@ extensions = [
 ]
 source_suffix = {".rst": "restructuredtext", ".md": "markdown"}
 master_doc = "index"
+# Auto-link bare URLs in Markdown content (e.g. the CLI reference, included
+# from the `inspect-jitsi --help` output, which writes plain
+# "https://..." text rather than Markdown link syntax).
+myst_enable_extensions = ["linkify"]
 # False positive: myst_parser checks every title in a document that
 # includes MyST content, including the host RST document's own top-level
 # title - which is correctly at "H1", not the "H2" it expects nested

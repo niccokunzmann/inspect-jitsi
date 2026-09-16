@@ -42,7 +42,11 @@ from inspect_jitsi.sync import (
 app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
-    help="Tools for inspecting a running Jitsi Meet deployment.",
+    help=(
+        "Tools for inspecting a running Jitsi Meet deployment.\n\n"
+        "Documentation: https://inspect-jitsi.readthedocs.io/en/latest/\n\n"
+        "Source code: https://github.com/niccokunzmann/inspect-jitsi"
+    ),
 )
 
 NameOption = typer.Option(

@@ -57,6 +57,7 @@ lint = [
 ]
 docs = [
     "inspect-jitsi[cli]",
+    "linkify-it-py >= 2.0.0", # myst_enable_extensions = ["linkify"] in conf.py
     "myst-parser >= 3.0.0",
     "pydata-sphinx-theme >= 0.14.4",
     "sphinx >= 7.2",
@@ -78,6 +79,7 @@ asyncio_mode = "auto"
 [tool.hatch.metadata.hooks.vcs.urls]
 #[project.urls]
 Homepage = "https://github.com/niccokunzmann/inspect-jitsi"
+Documentation = "https://inspect-jitsi.readthedocs.io/en/latest/"
 Repository = "https://github.com/niccokunzmann/inspect-jitsi"
 "Source Archive" = "https://github.com/niccokunzmann/inspect-jitsi/archive/{commit_hash}.zip"
 Issues = "https://github.com/niccokunzmann/inspect-jitsi/issues"

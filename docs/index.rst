@@ -85,6 +85,10 @@ inspect-jitsi inspects a running `Jitsi Meet <https://jitsi.org/>`_ deployment -
 
 -   :ref:`genindex`
 
+Related projects
+----------------
+`matrix-jitsi-bot <https://matrix-jitsi-bot.readthedocs.io/>`_ - watches Jitsi conferences and reports their status to Matrix chat rooms.
+
 License
 -------
 See `LICENSE <https://github.com/niccokunzmann/inspect-jitsi/blob/main/LICENSE>`_.
