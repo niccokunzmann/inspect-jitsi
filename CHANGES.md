@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0
 
 - Fix: XMPP stanzas received from the server are now parsed with
   `defusedxml` instead of the standard library's `xml.etree.ElementTree`
