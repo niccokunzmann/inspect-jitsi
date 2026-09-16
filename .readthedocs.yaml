@@ -1,0 +1,26 @@
+# Read the Docs configuration file
+# See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
+
+version: 2
+
+build:
+  os: ubuntu-24.04
+  tools:
+    python: "3.13"
+  jobs:
+    post_checkout:
+      # hatch-vcs derives the version from git tags; RTD's default clone is
+      # shallow and tagless.
+      - git fetch --unshallow || true
+      - git fetch --tags || true
+    build:
+      html:
+        # Same build `make html` runs locally and in CI - it manages its
+        # own venv (via `python3 -m venv`, not RTD's), so this replaces
+        # RTD's own `python -m sphinx ...` invocation rather than feeding
+        # it. `make html`'s `.venv` prerequisite installs everything
+        # (inspect-jitsi itself, plus its test/cli/docs/lint extras) into it.
+        - make html BUILDDIR=$READTHEDOCS_OUTPUT
+
+sphinx:
+  configuration: docs/conf.py
