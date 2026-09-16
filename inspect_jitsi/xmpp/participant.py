@@ -15,8 +15,11 @@
 from __future__ import annotations
 
 import json
-import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import xml.etree.ElementTree as ET
 
 __all__ = ["Participant"]
 

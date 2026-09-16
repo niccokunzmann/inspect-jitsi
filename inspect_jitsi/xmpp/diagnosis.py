@@ -21,14 +21,20 @@ __all__ = ["DiagnosisResult"]
 
 @dataclass
 class DiagnosisResult:
-    """What's needed to read a Jitsi room's occupancy, as found by `JitsiConference.diagnose()`.
+    """What's needed to read a Jitsi room's occupancy.
+
+    As found by `JitsiConference.diagnose()`.
 
     Example::
 
         DiagnosisResult(
             ws_domain="meet.example.com",
             config_js_reachable=True,
-            discovered_hosts={"domain": "meet.jitsi", "muc": "muc.meet.jitsi", "anonymousdomain": None},
+            discovered_hosts={
+                "domain": "meet.jitsi",
+                "muc": "muc.meet.jitsi",
+                "anonymousdomain": None,
+            },
             xmpp_domain_tried="meet.jitsi",
             domain_recognized=True,
             sasl_mechanisms=["ANONYMOUS"],

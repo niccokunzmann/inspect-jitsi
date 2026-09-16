@@ -42,7 +42,12 @@ NICK = "probe-test"
 
 def make_conference(**kwargs) -> JitsiConference:
     return JitsiConference(
-        CONFERENCE_URL, NICK, anonymous_domain=XMPP_DOMAIN, muc_domain=MUC_DOMAIN, timeout=1, **kwargs
+        CONFERENCE_URL,
+        NICK,
+        anonymous_domain=XMPP_DOMAIN,
+        muc_domain=MUC_DOMAIN,
+        timeout=1,
+        **kwargs,
     )
 
 
@@ -131,7 +136,9 @@ async def test_is_created_tolerates_missing_xmlns_stream(fake_server) -> None:
     assert await conference.is_created() is True
 
 
-async def test_is_created_raises_jitsi_connection_error_on_dropped_connection(fake_server) -> None:
+async def test_is_created_raises_jitsi_connection_error_on_dropped_connection(
+    fake_server,
+) -> None:
     """A transport failure during is_created() must surface as this
     library's own exception type, not a raw `websockets` exception."""
     fake_server([stream_open(), ConnectionClosedError(None, None)])

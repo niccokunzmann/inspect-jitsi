@@ -22,9 +22,12 @@ participants may notice).
 from __future__ import annotations
 
 import asyncio
+from typing import TYPE_CHECKING
 
 from inspect_jitsi.xmpp.conference import JitsiConference
-from inspect_jitsi.xmpp.participant import Participant
+
+if TYPE_CHECKING:
+    from inspect_jitsi.xmpp.participant import Participant
 
 __all__ = ["get_participants"]
 

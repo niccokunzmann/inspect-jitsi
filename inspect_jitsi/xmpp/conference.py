@@ -21,6 +21,7 @@ is the class user code is expected to reach for.
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+from typing import TYPE_CHECKING, Self
 
 import websockets
 
@@ -41,7 +42,9 @@ from inspect_jitsi.xmpp.connection import (
     resolve_domains,
 )
 from inspect_jitsi.xmpp.diagnosis import DiagnosisResult
-from inspect_jitsi.xmpp.participant import Participant
+
+if TYPE_CHECKING:
+    from inspect_jitsi.xmpp.participant import Participant
 
 __all__ = ["JitsiConference"]
 
@@ -119,9 +122,9 @@ class JitsiConference:
         left) - this tells the two apart without joining.
 
         Raises:
-            JitsiConnectionError: the XMPP connection failed or was lost
-                (refused, dropped, timed out, or an unparseable server
-                response) - not raised for a room that simply doesn't
+            inspect_jitsi.xmpp.JitsiConnectionError: the XMPP connection
+                failed or was lost (refused, dropped, timed out, or an
+                unparseable server response) - not raised for a room that simply doesn't
                 exist, which is reported as `False`.
         """
         ws_domain, room = parse_conference_url(self.conference_url)
@@ -173,7 +176,10 @@ class JitsiConference:
             result.error = f"config.js: {exc}"
 
         xmpp_domain = (
-            self._anonymous_domain or hosts["anonymousdomain"] or hosts["domain"] or ws_domain
+            self._anonymous_domain
+            or hosts["anonymousdomain"]
+            or hosts["domain"]
+            or ws_domain
         )
         result.xmpp_domain_tried = xmpp_domain
 
@@ -193,7 +199,9 @@ class JitsiConference:
             ws_url, subprotocols=["xmpp"], open_timeout=self.timeout
         )
         async with connect as ws:
-            await ws.send(f'<open xmlns="{_NS_FRAMING}" to="{xmpp_domain}" version="1.0"/>')
+            await ws.send(
+                f'<open xmlns="{_NS_FRAMING}" to="{xmpp_domain}" version="1.0"/>'
+            )
             opened = await _recv_stanza(ws, self.timeout)
             if _local(opened.tag) == "error":
                 result.domain_recognized = False
@@ -203,7 +211,9 @@ class JitsiConference:
 
             features = await _recv_stanza(ws, self.timeout)
             result.sasl_mechanisms = [
-                m.text for m in features.iter() if _local(m.tag) == "mechanism" and m.text
+                m.text
+                for m in features.iter()
+                if _local(m.tag) == "mechanism" and m.text
             ]
 
             if "ANONYMOUS" not in result.sasl_mechanisms:
@@ -219,7 +229,7 @@ class JitsiConference:
                 result.anonymous_login_ok = False
                 result.error = ET.tostring(auth_result, encoding="unicode")
 
-    async def __aenter__(self) -> JitsiConference:
+    async def __aenter__(self) -> Self:
         await self.open()
         return self
 

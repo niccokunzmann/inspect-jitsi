@@ -29,13 +29,17 @@ from inspect_jitsi.xmpp.connection import parse_conference_url
         ("https://meet.example.com/SomeRoom?jwt=abc", "meet.example.com", "SomeRoom"),
     ],
 )
-def test_parses_domain_and_room(url: str, expected_domain: str, expected_room: str) -> None:
+def test_parses_domain_and_room(
+    url: str, expected_domain: str, expected_room: str
+) -> None:
     domain, room = parse_conference_url(url)
     assert domain == expected_domain
     assert room == expected_room
 
 
-@pytest.mark.parametrize("url", ["https://meet.example.com/", "https://meet.example.com", ""])
+@pytest.mark.parametrize(
+    "url", ["https://meet.example.com/", "https://meet.example.com", ""]
+)
 def test_raises_without_a_room(url: str) -> None:
     with pytest.raises(ValueError, match="Could not parse"):
         parse_conference_url(url)

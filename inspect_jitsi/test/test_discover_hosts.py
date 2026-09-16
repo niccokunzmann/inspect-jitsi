@@ -14,11 +14,14 @@
 
 from __future__ import annotations
 
-import pytest
+from typing import TYPE_CHECKING
 
 from inspect_jitsi.test.conftest import FakeConfigJsSession
 from inspect_jitsi.xmpp import connection as connection_module
 from inspect_jitsi.xmpp.connection import discover_hosts
+
+if TYPE_CHECKING:
+    import pytest
 
 # A trimmed but realistic docker-jitsi-meet config.js, as served by a real
 # deployment: internal domain names differ from the public hostname, and
@@ -47,7 +50,9 @@ def _serve(monkeypatch: pytest.MonkeyPatch, text: str) -> None:
     )
 
 
-async def test_discovers_docker_jitsi_meet_style_hosts(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_discovers_docker_jitsi_meet_style_hosts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     _serve(monkeypatch, DOCKER_JITSI_MEET_CONFIG_JS)
 
     hosts = await discover_hosts("meet.example.com")
@@ -59,7 +64,9 @@ async def test_discovers_docker_jitsi_meet_style_hosts(monkeypatch: pytest.Monke
     }
 
 
-async def test_discovers_explicit_anonymous_domain(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_discovers_explicit_anonymous_domain(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     _serve(monkeypatch, CONFIG_JS_WITH_ANONYMOUS_DOMAIN)
 
     hosts = await discover_hosts("meet.example.com")
@@ -71,7 +78,9 @@ async def test_discovers_explicit_anonymous_domain(monkeypatch: pytest.MonkeyPat
     }
 
 
-async def test_missing_config_js_fields_are_none(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_missing_config_js_fields_are_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     _serve(monkeypatch, "var config = {};")
 
     hosts = await discover_hosts("meet.example.com")

@@ -50,7 +50,10 @@ def test_parses_all_known_fields() -> None:
     assert participant.name == "Nicco Kunzmann"
     assert participant.role == "moderator"
     assert participant.affiliation == "owner"
-    assert participant.real_jid == "486133d8-00c7-4027-81e3-7c849fb76996@meet.jitsi/rA7_DRbuFeiN"
+    assert (
+        participant.real_jid
+        == "486133d8-00c7-4027-81e3-7c849fb76996@meet.jitsi/rA7_DRbuFeiN"
+    )
     assert participant.occupant_id == "vauNPqXDtqVuAIkJqE23tnwMIV8TyNcxp7J25IRY+Po="
 
 

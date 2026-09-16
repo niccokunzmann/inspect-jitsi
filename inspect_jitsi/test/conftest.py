@@ -21,6 +21,7 @@ a docker-jitsi-meet deployment (see `inspect_jitsi/xmpp/connection.py`).
 from __future__ import annotations
 
 import asyncio
+from typing import Self
 
 import pytest
 
@@ -146,7 +147,9 @@ def error_presence(nick: str, *, room_jid: str = ROOM_JID) -> str:
 
 
 def unavailable_presence(nick: str, *, room_jid: str = ROOM_JID) -> str:
-    return f"<presence xmlns='jabber:client' type='unavailable' from='{room_jid}/{nick}'/>"
+    return (
+        f"<presence xmlns='jabber:client' type='unavailable' from='{room_jid}/{nick}'/>"
+    )
 
 
 def room_creation_restricted_presence(nick: str, *, room_jid: str = ROOM_JID) -> str:
@@ -182,7 +185,9 @@ def forbidden_disco_error(*, room_jid: str = ROOM_JID) -> str:
     )
 
 
-def join_script(nick: str, other_occupants: tuple[str, ...] = (), *, include_focus: bool = True) -> list[str]:
+def join_script(
+    nick: str, other_occupants: tuple[str, ...] = (), *, include_focus: bool = True
+) -> list[str]:
     """Presence stanzas the MUC sends back after a join, ending with self-presence."""
     script = [occupant_presence(other) for other in other_occupants]
     if include_focus:
@@ -220,7 +225,7 @@ class FakeWebSocket:
     async def close(self) -> None:
         self.closed = True
 
-    async def __aenter__(self) -> FakeWebSocket:
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, *exc_info: object) -> None:
@@ -260,10 +265,12 @@ class FakeConfigJsSession:
     def __init__(self, text: str) -> None:
         self._text = text
 
-    async def get(self, _url: str, timeout: float | None = None) -> FakeConfigJsResponse:  # noqa: ARG002
+    async def get(
+        self, _url: str, timeout: float | None = None
+    ) -> FakeConfigJsResponse:
         return FakeConfigJsResponse(self._text)
 
-    async def __aenter__(self) -> FakeConfigJsSession:
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, *exc_info: object) -> None:
@@ -276,7 +283,9 @@ def fake_config_js(monkeypatch: pytest.MonkeyPatch):
     import inspect_jitsi.xmpp.connection as connection_module
 
     monkeypatch.setattr(
-        connection_module.niquests, "AsyncSession", lambda: FakeConfigJsSession(CONFIG_JS)
+        connection_module.niquests,
+        "AsyncSession",
+        lambda: FakeConfigJsSession(CONFIG_JS),
     )
 
 

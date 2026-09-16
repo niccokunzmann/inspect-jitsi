@@ -10,14 +10,19 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""`diagnose_jitsi_access`: a one-shot report of what's needed to read a room's occupancy."""
+"""`diagnose_jitsi_access`: a one-shot report of what's needed to read a
+room's occupancy.
+"""
 
 from __future__ import annotations
 
 import asyncio
+from typing import TYPE_CHECKING
 
 from inspect_jitsi.xmpp.conference import JitsiConference
-from inspect_jitsi.xmpp.diagnosis import DiagnosisResult
+
+if TYPE_CHECKING:
+    from inspect_jitsi.xmpp.diagnosis import DiagnosisResult
 
 __all__ = ["diagnose_jitsi_access"]
 

@@ -27,7 +27,9 @@ import json
 try:
     import typer
 except ModuleNotFoundError as exc:
-    msg = "The inspect-jitsi CLI requires the 'cli' extra: pip install inspect-jitsi[cli]"
+    msg = (
+        "The inspect-jitsi CLI requires the 'cli' extra: pip install inspect-jitsi[cli]"
+    )
     raise ModuleNotFoundError(msg) from exc
 
 from inspect_jitsi.sync import (
@@ -54,7 +56,9 @@ NameOption = typer.Option(
 def _fail(action: str, conference_url: str, exc: Exception) -> None:
     typer.echo(f"Failed to {action}: {exc}", err=True)
     typer.echo("Running diagnostics...", err=True)
-    typer.echo(json.dumps(diagnose_jitsi_access(conference_url).to_dict(), indent=2), err=True)
+    typer.echo(
+        json.dumps(diagnose_jitsi_access(conference_url).to_dict(), indent=2), err=True
+    )
     raise typer.Exit(1) from exc
 
 

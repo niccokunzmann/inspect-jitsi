@@ -36,6 +36,7 @@ classifiers = [
 ]
 
 dependencies = [
+    "defusedxml >= 0.7.1",
     "niquests >= 3.7.0",
     "websockets >= 12.0",
 ]
@@ -49,6 +50,22 @@ test = [
     "pytest-asyncio",
     "pytest-cov",
     "inspect-jitsi[cli]",
+]
+lint = [
+    "ruff==0.16.8", # also update .pre-commit-config.yaml
+    "pre-commit",
+]
+docs = [
+    "inspect-jitsi[cli]",
+    "myst-parser >= 3.0.0",
+    "pydata-sphinx-theme >= 0.14.4",
+    "sphinx >= 7.2",
+    "sphinx-autobuild >= 2021.3.14",
+    "sphinx-autodoc-typehints",
+    "sphinx-copybutton >= 0.5.2",
+    "sphinx-design >= 0.5.0",
+    "sphinx-notfound-page >= 1.1.0",
+    "sphinx-reredirects >= 0.1.6",
 ]
 
 [project.scripts]
@@ -86,16 +103,20 @@ target-version = "py311"
 select = ["ALL"]
 ignore = [
     "ANN",     # flake8-annotations
+    "ASYNC109",# Async function definition with a `timeout` parameter - this library's own public API shape
     "B020",    # Loop control variable {name} overrides iterable it iterates
     "C401",    # Unnecessary generator (rewrite as a set comprehension)
     "C901",    # {name} is too complex ({complexity} > {max_complexity})
     "COM812",  # Trailing comma missing
+    "CPY001",  # Missing copyright notice at top of file - GPL header present, just not in flake8-copyright's expected form
     "D1",      # Missing docstring
     "D2",      # docstrings stuffs
     "D4",      # docstrings stuffs
     "EM10",    # Exception string usage
     "ERA001",  # Found commented-out code
+    "FBT001",  # Boolean-typed positional argument in function definition - typer flags need this
     "FBT002",  # Boolean default positional argument in function definition
+    "FBT003",  # Boolean positional value in function call - typer flags need this
     "FIX",     # TODO comments
     "ISC001",  # Implicitly concatenated string literals on one line (to avoid with formatter)
     "N818",    # Exception name {name} should be named with an Error suffix
@@ -106,10 +127,20 @@ ignore = [
     "S101",    # Use of assert detected
     "TD",      # TODO comments
     "TRY003",  # Avoid specifying long messages outside the exception class
+    "TRY301",  # Abstract `raise` to an inner function
     "UP007",   # Use | None instead of Optional
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"inspect_jitsi/test/*" = [
-    "T201",   # print found
+"inspect_jitsi/test/**" = [
+    "ARG001",  # Unused function argument - pytest fixtures used only for their side effect
+    "ARG002",  # Unused method argument - same, on fake/stub methods
+    "ARG005",  # Unused lambda argument - fake `websockets.connect(*args, **kwargs)` stand-ins
+    "E501",    # Line too long - long XMPP/XML stanza literals used as test fixtures
+    "PLC0415", # Import outside top-level - common in tests, to scope monkeypatching
+    "S314",    # Using `xml` to parse untrusted data - trusted, hardcoded test fixtures, not a live server
+    "T201",    # print found
+]
+"docs/conf.py" = [
+    "INP001", # File is part of an implicit namespace package - not a package, just Sphinx config
 ]

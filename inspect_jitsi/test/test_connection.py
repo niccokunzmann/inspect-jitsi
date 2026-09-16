@@ -17,7 +17,6 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 
 import pytest
-
 from websockets.exceptions import ConnectionClosedError
 
 from inspect_jitsi.test.conftest import (
@@ -78,7 +77,7 @@ async def test_open_counts_only_humans(fake_server) -> None:
     finally:
         await conn.close()
 
-    assert any("type=\"unavailable\"" in s for s in ws.sent)
+    assert any('type="unavailable"' in s for s in ws.sent)
     assert ws.closed
 
 
@@ -92,7 +91,10 @@ async def test_join_presence_discloses_default_display_name(fake_server) -> None
         assert conn.name == "inspect-jitsi"
 
     join_presence = next(s for s in ws.sent if "<x xmlns=" in s)
-    assert '<nick xmlns="http://jabber.org/protocol/nick">inspect-jitsi</nick>' in join_presence
+    assert (
+        '<nick xmlns="http://jabber.org/protocol/nick">inspect-jitsi</nick>'
+        in join_presence
+    )
 
 
 async def test_join_presence_discloses_a_custom_display_name(fake_server) -> None:
@@ -105,7 +107,9 @@ async def test_join_presence_discloses_a_custom_display_name(fake_server) -> Non
     assert '<nick xmlns="http://jabber.org/protocol/nick">Alice</nick>' in join_presence
 
 
-async def test_join_presence_escapes_a_display_name_with_xml_special_characters(fake_server) -> None:
+async def test_join_presence_escapes_a_display_name_with_xml_special_characters(
+    fake_server,
+) -> None:
     ws = fake_server([*handshake_script(), *join_script(NICK)])
 
     async with make_connection(name="<Alice> & Bob"):
@@ -129,8 +133,11 @@ async def test_multiple_humans_are_all_counted(fake_server) -> None:
 
     async with make_connection() as conn:
         participants = await conn.get_participants()
-        assert sorted(p.jid for p in participants) == [f"{ROOM_JID}/alice", f"{ROOM_JID}/bob"]
-        assert await conn.get_participant_count() == 2  # noqa: PLR2004
+        assert sorted(p.jid for p in participants) == [
+            f"{ROOM_JID}/alice",
+            f"{ROOM_JID}/bob",
+        ]
+        assert await conn.get_participant_count() == 2
 
 
 async def test_ws_raises_after_close(fake_server) -> None:
@@ -224,6 +231,30 @@ async def test_unparseable_stanza_raises_jitsi_connection_error(fake_server) -> 
     still raise the library's own exception type instead of a raw
     xml.etree.ElementTree.ParseError."""
     fake_server([stream_open(), "<this is not valid xml"])
+
+    conn = make_connection()
+    with pytest.raises(JitsiConnectionError):
+        await conn.open()
+
+
+async def test_malicious_entity_expansion_stanza_raises_jitsi_connection_error(
+    fake_server,
+) -> None:
+    """A conference URL is arbitrary, caller-supplied input, so the server it
+    resolves to is untrusted - a "billion laughs"-style entity-expansion
+    bomb in a stanza must be rejected (as a JitsiConnectionError, like any
+    other unparseable reply) rather than expanded, which is what a plain
+    xml.etree.ElementTree.fromstring would do. See connection.py's use of
+    `defusedxml` instead."""
+    bomb = (
+        '<?xml version="1.0"?>'
+        "<!DOCTYPE lolz ["
+        '<!ENTITY lol "lol">'
+        '<!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;">'
+        "]>"
+        "<lolz>&lol2;</lolz>"
+    )
+    fake_server([stream_open(), bomb])
 
     conn = make_connection()
     with pytest.raises(JitsiConnectionError):

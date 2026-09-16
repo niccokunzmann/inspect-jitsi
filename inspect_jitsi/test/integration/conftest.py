@@ -93,5 +93,7 @@ def real_config_js(monkeypatch: pytest.MonkeyPatch):
     import inspect_jitsi.xmpp.connection as connection_module
 
     monkeypatch.setattr(
-        connection_module.niquests, "AsyncSession", lambda: FakeConfigJsSession(REAL_CONFIG_JS)
+        connection_module.niquests,
+        "AsyncSession",
+        lambda: FakeConfigJsSession(REAL_CONFIG_JS),
     )

@@ -29,7 +29,7 @@ runner = CliRunner()
 
 
 def test_count_prints_the_participant_count(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(cli, "get_participant_count", lambda url, name: 3)  # noqa: ARG005
+    monkeypatch.setattr(cli, "get_participant_count", lambda url, name: 3)
 
     result = runner.invoke(cli.app, ["count", "https://meet.example.com/room"])
 
@@ -60,7 +60,9 @@ def test_count_accepts_name_option(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(cli, "get_participant_count", fake_get_participant_count)
 
-    runner.invoke(cli.app, ["count", "--name", "Alice", "https://meet.example.com/room"])
+    runner.invoke(
+        cli.app, ["count", "--name", "Alice", "https://meet.example.com/room"]
+    )
 
     assert seen["name"] == "Alice"
 
@@ -80,14 +82,18 @@ def test_count_accepts_name_from_env_var(monkeypatch: pytest.MonkeyPatch) -> Non
     assert seen["name"] == "FromEnv"
 
 
-def test_count_reports_failure_and_runs_diagnostics(monkeypatch: pytest.MonkeyPatch) -> None:
-    def failing_get_participant_count(_url: str, name: str) -> int:  # noqa: ARG001
+def test_count_reports_failure_and_runs_diagnostics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def failing_get_participant_count(_url: str, name: str) -> int:
         msg = "boom"
         raise RuntimeError(msg)
 
     monkeypatch.setattr(cli, "get_participant_count", failing_get_participant_count)
     monkeypatch.setattr(
-        cli, "diagnose_jitsi_access", lambda url: DiagnosisResult(ws_domain=url)  # noqa: ARG005
+        cli,
+        "diagnose_jitsi_access",
+        lambda url: DiagnosisResult(ws_domain=url),
     )
 
     result = runner.invoke(cli.app, ["count", "https://meet.example.com/room"])
@@ -98,7 +104,7 @@ def test_count_reports_failure_and_runs_diagnostics(monkeypatch: pytest.MonkeyPa
 
 def test_participants_prints_indented_json(monkeypatch: pytest.MonkeyPatch) -> None:
     people = [Participant(jid="room@muc.example.com/alice", nick="alice", name="Alice")]
-    monkeypatch.setattr(cli, "get_participants", lambda url, name: people)  # noqa: ARG005
+    monkeypatch.setattr(cli, "get_participants", lambda url, name: people)
 
     result = runner.invoke(cli.app, ["participants", "https://meet.example.com/room"])
 
@@ -126,19 +132,25 @@ def test_participants_accepts_name_option(monkeypatch: pytest.MonkeyPatch) -> No
 
     monkeypatch.setattr(cli, "get_participants", fake_get_participants)
 
-    runner.invoke(cli.app, ["participants", "--name", "Bob", "https://meet.example.com/room"])
+    runner.invoke(
+        cli.app, ["participants", "--name", "Bob", "https://meet.example.com/room"]
+    )
 
     assert seen["name"] == "Bob"
 
 
-def test_participants_reports_failure_and_runs_diagnostics(monkeypatch: pytest.MonkeyPatch) -> None:
-    def failing_get_participants(_url: str, name: str) -> list[Participant]:  # noqa: ARG001
+def test_participants_reports_failure_and_runs_diagnostics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def failing_get_participants(_url: str, name: str) -> list[Participant]:
         msg = "boom"
         raise RuntimeError(msg)
 
     monkeypatch.setattr(cli, "get_participants", failing_get_participants)
     monkeypatch.setattr(
-        cli, "diagnose_jitsi_access", lambda url: DiagnosisResult(ws_domain=url)  # noqa: ARG005
+        cli,
+        "diagnose_jitsi_access",
+        lambda url: DiagnosisResult(ws_domain=url),
     )
 
     result = runner.invoke(cli.app, ["participants", "https://meet.example.com/room"])
@@ -151,7 +163,7 @@ def test_diagnose_prints_json_report(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         cli,
         "diagnose_jitsi_access",
-        lambda url: DiagnosisResult(ws_domain=url, anonymous_login_ok=True),  # noqa: ARG005
+        lambda url: DiagnosisResult(ws_domain=url, anonymous_login_ok=True),
     )
 
     result = runner.invoke(cli.app, ["diagnose", "https://meet.example.com/room"])
@@ -163,7 +175,7 @@ def test_diagnose_prints_json_report(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_created_exits_0_when_the_room_exists(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(cli, "is_room_created", lambda url: True)  # noqa: ARG005
+    monkeypatch.setattr(cli, "is_room_created", lambda url: True)
 
     result = runner.invoke(cli.app, ["created", "https://meet.example.com/room"])
 
@@ -171,8 +183,10 @@ def test_created_exits_0_when_the_room_exists(monkeypatch: pytest.MonkeyPatch) -
     assert result.output == ""
 
 
-def test_created_exits_1_when_the_room_does_not_exist(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(cli, "is_room_created", lambda url: False)  # noqa: ARG005
+def test_created_exits_1_when_the_room_does_not_exist(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(cli, "is_room_created", lambda url: False)
 
     result = runner.invoke(cli.app, ["created", "https://meet.example.com/room"])
 
@@ -189,36 +203,44 @@ def test_created_exits_2_on_failure(monkeypatch: pytest.MonkeyPatch) -> None:
 
     result = runner.invoke(cli.app, ["created", "https://meet.example.com/room"])
 
-    assert result.exit_code == 2  # noqa: PLR2004
+    assert result.exit_code == 2
     assert "boom" in result.output
 
 
 def test_created_json_prints_true_and_exits_0(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(cli, "is_room_created", lambda url: True)  # noqa: ARG005
+    monkeypatch.setattr(cli, "is_room_created", lambda url: True)
 
-    result = runner.invoke(cli.app, ["created", "--json", "https://meet.example.com/room"])
+    result = runner.invoke(
+        cli.app, ["created", "--json", "https://meet.example.com/room"]
+    )
 
     assert result.exit_code == 0
     assert result.stdout.strip() == "true"
 
 
 def test_created_json_prints_false_and_exits_1(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(cli, "is_room_created", lambda url: False)  # noqa: ARG005
+    monkeypatch.setattr(cli, "is_room_created", lambda url: False)
 
-    result = runner.invoke(cli.app, ["created", "--json", "https://meet.example.com/room"])
+    result = runner.invoke(
+        cli.app, ["created", "--json", "https://meet.example.com/room"]
+    )
 
     assert result.exit_code == 1
     assert result.stdout.strip() == "false"
 
 
-def test_created_json_reports_error_and_exits_2(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_created_json_reports_error_and_exits_2(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     def failing_is_room_created(_url: str) -> bool:
         msg = "boom"
         raise RuntimeError(msg)
 
     monkeypatch.setattr(cli, "is_room_created", failing_is_room_created)
 
-    result = runner.invoke(cli.app, ["created", "--json", "https://meet.example.com/room"])
+    result = runner.invoke(
+        cli.app, ["created", "--json", "https://meet.example.com/room"]
+    )
 
-    assert result.exit_code == 2  # noqa: PLR2004
+    assert result.exit_code == 2
     assert json.loads(result.output)["error"] == "boom"

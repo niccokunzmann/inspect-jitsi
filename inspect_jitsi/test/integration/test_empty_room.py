@@ -57,8 +57,12 @@ ITEM_NOT_FOUND_DISCO_ERROR = (
 )
 
 
-async def test_open_does_not_raise_and_reports_room_not_created(real_config_js, fake_server) -> None:
-    ws = fake_server([*REAL_HANDSHAKE, ROOM_CREATION_RESTRICTED_PRESENCE.format(nick=NICK)])
+async def test_open_does_not_raise_and_reports_room_not_created(
+    real_config_js, fake_server
+) -> None:
+    ws = fake_server(
+        [*REAL_HANDSHAKE, ROOM_CREATION_RESTRICTED_PRESENCE.format(nick=NICK)]
+    )
 
     conn = JitsiXmppConnection(CONFERENCE_URL, NICK)
     await conn.open()  # must not raise
@@ -91,7 +95,9 @@ def test_is_room_created_is_false(real_config_js, fake_server) -> None:
     assert is_room_created(CONFERENCE_URL) is False
 
 
-async def test_jitsi_conference_is_created_is_false(real_config_js, fake_server) -> None:
+async def test_jitsi_conference_is_created_is_false(
+    real_config_js, fake_server
+) -> None:
     fake_server([*REAL_HANDSHAKE, ITEM_NOT_FOUND_DISCO_ERROR])
 
     conference = JitsiConference(CONFERENCE_URL)

@@ -20,7 +20,11 @@ while it had exactly one person (Nicco Kunzmann) in it - see
 
 from __future__ import annotations
 
-from inspect_jitsi.sync import diagnose_jitsi_access, get_participant_count, get_participants
+from inspect_jitsi.sync import (
+    diagnose_jitsi_access,
+    get_participant_count,
+    get_participants,
+)
 from inspect_jitsi.test.integration.conftest import (
     CONFERENCE_URL,
     NICK,
@@ -97,13 +101,17 @@ def test_diagnose_reports_anonymous_login_ok(real_config_js, fake_server) -> Non
 def test_get_participant_count_matches_the_one_person_in_the_room(
     real_config_js, fake_server
 ) -> None:
-    fake_server([*REAL_HANDSHAKE, NICCO_KUNZMANN_PRESENCE, FOCUS_PRESENCE, self_presence(NICK)])
+    fake_server(
+        [*REAL_HANDSHAKE, NICCO_KUNZMANN_PRESENCE, FOCUS_PRESENCE, self_presence(NICK)]
+    )
 
     assert get_participant_count(CONFERENCE_URL, NICK) == 1
 
 
 def test_get_participants_reports_nicco_kunzmann(real_config_js, fake_server) -> None:
-    fake_server([*REAL_HANDSHAKE, NICCO_KUNZMANN_PRESENCE, FOCUS_PRESENCE, self_presence(NICK)])
+    fake_server(
+        [*REAL_HANDSHAKE, NICCO_KUNZMANN_PRESENCE, FOCUS_PRESENCE, self_presence(NICK)]
+    )
 
     people = get_participants(CONFERENCE_URL, NICK)
 
@@ -120,7 +128,9 @@ def test_get_participants_reports_nicco_kunzmann(real_config_js, fake_server) ->
 async def test_jitsi_conference_context_manager_replaying_real_traffic(
     real_config_js, fake_server
 ) -> None:
-    fake_server([*REAL_HANDSHAKE, NICCO_KUNZMANN_PRESENCE, FOCUS_PRESENCE, self_presence(NICK)])
+    fake_server(
+        [*REAL_HANDSHAKE, NICCO_KUNZMANN_PRESENCE, FOCUS_PRESENCE, self_presence(NICK)]
+    )
 
     async with JitsiConference(CONFERENCE_URL, NICK) as conference:
         people = await conference.get_participants()

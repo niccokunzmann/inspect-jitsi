@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Fix: XMPP stanzas received from the server are now parsed with
+  `defusedxml` instead of the standard library's `xml.etree.ElementTree`
+  directly - a conference URL is arbitrary, caller-supplied input, so a
+  malicious server could otherwise send a billion-laughs/XXE-style XML bomb
+  that got silently expanded instead of rejected.
 - Add a `name` option (CLI `--name`, `INSPECT_JITSI_NAME` environment
   variable, and `name=` on `get_participant_count`/`get_participants`/
   `JitsiConference`/`JitsiXmppConnection`) to set the display name disclosed

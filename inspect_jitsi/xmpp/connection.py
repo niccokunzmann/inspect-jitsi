@@ -29,6 +29,11 @@ transport Jitsi requires - they're TCP-only, and Jitsi deployments generally
 don't expose raw XMPP client-to-server (5222) publicly - so this hand-rolls
 the small slice of RFC 6120 (stream/SASL/bind) and RFC 7395 (XMPP over
 WebSocket framing) needed to join a MUC room.
+
+A conference URL is arbitrary, caller-supplied input, so the server it
+resolves to is untrusted - stanzas are parsed with `defusedxml` rather than
+the standard library's `xml.etree.ElementTree` directly, which guards
+against billion-laughs/XXE-style XML bombs a malicious server could send.
 """
 
 from __future__ import annotations
@@ -37,11 +42,14 @@ import asyncio
 import re
 import uuid
 import xml.etree.ElementTree as ET
+from typing import Self
 from urllib.parse import urlparse
 from xml.sax.saxutils import escape
 
+import defusedxml.ElementTree as DefusedET
 import niquests
 import websockets
+from defusedxml.common import DefusedXmlException
 from websockets.exceptions import ConnectionClosed, WebSocketException
 
 from inspect_jitsi.xmpp.participant import Participant
@@ -64,8 +72,17 @@ _NS_STREAM = "http://etherx.jabber.org/streams"
 
 # Anything a live WebSocket/XMPP round trip can raise below the
 # room-existence/roster level: a dropped or refused connection, a timeout,
-# or a server response this hand-rolled client can't parse.
-_TRANSPORT_ERRORS = (OSError, TimeoutError, WebSocketException, ET.ParseError)
+# a server response this hand-rolled client can't parse, or one rejected by
+# defusedxml as a billion-laughs/XXE-style attack (see `_recv_stanza`) - a
+# conference URL is arbitrary, user-supplied input, so the server on the
+# other end of it must be treated as untrusted.
+_TRANSPORT_ERRORS = (
+    OSError,
+    TimeoutError,
+    WebSocketException,
+    ET.ParseError,
+    DefusedXmlException,
+)
 
 FOCUS_NICK = "focus"
 """MUC nickname jicofo always joins under - not a human participant."""
@@ -146,8 +163,8 @@ def parse_conference_url(conference_url: str) -> tuple[str, str]:
 def _eval_js_string_concat(expr: str, variables: dict[str, str]) -> str:
     """Best-effort evaluator for simple JS `'a' + b + 'c'` string concatenations."""
     result = []
-    for token in expr.split("+"):
-        token = token.strip()
+    for raw_token in expr.split("+"):
+        token = raw_token.strip()
         if len(token) >= 2 and token[0] == token[-1] and token[0] in "'\"":
             result.append(token[1:-1])
         elif token in variables:
@@ -163,7 +180,11 @@ def _parse_config_js(text: str) -> dict[str, str | None]:
         name, literal = match.group(1), match.group(2)
         variables[name] = literal[1:-1]
 
-    hosts: dict[str, str | None] = {"domain": None, "muc": None, "anonymousdomain": None}
+    hosts: dict[str, str | None] = {
+        "domain": None,
+        "muc": None,
+        "anonymousdomain": None,
+    }
     for key in hosts:
         match = re.search(rf"hosts\.{key}\s*=\s*([^;]+);", text)
         if match:
@@ -172,7 +193,7 @@ def _parse_config_js(text: str) -> dict[str, str | None]:
 
 
 async def discover_hosts(domain: str, timeout: float = 10) -> dict[str, str | None]:
-    """Read https://<domain>/config.js to find the real XMPP/MUC domains.
+    """Read ``https://<domain>/config.js`` to find the real XMPP/MUC domains.
 
     A Jitsi deployment's internal domain names often differ from the public
     hostname (e.g. docker-jitsi-meet defaults to "meet.jitsi" internally).
@@ -232,7 +253,7 @@ def _repair_unbound_stream_prefix(message: str) -> str:
     if match is None:
         return message
     tag, rest = match.group(1), match.group(2)
-    return f'<stream:{tag} xmlns:stream="{_NS_STREAM}"{rest}>{message[match.end():]}'
+    return f'<stream:{tag} xmlns:stream="{_NS_STREAM}"{rest}>{message[match.end() :]}'
 
 
 async def _recv_stanza(ws: websockets.ClientConnection, timeout: float) -> ET.Element:
@@ -244,11 +265,11 @@ async def _recv_stanza(ws: websockets.ClientConnection, timeout: float) -> ET.El
         raise JitsiConnectionError(msg) from exc
 
     try:
-        return ET.fromstring(message)
-    except ET.ParseError:
+        return DefusedET.fromstring(message)
+    except (ET.ParseError, DefusedXmlException):
         try:
-            return ET.fromstring(_repair_unbound_stream_prefix(message))
-        except ET.ParseError as exc:
+            return DefusedET.fromstring(_repair_unbound_stream_prefix(message))
+        except (ET.ParseError, DefusedXmlException) as exc:
             msg = f"Could not parse a reply from the server: {message!r}"
             raise JitsiConnectionError(msg) from exc
 
@@ -259,7 +280,8 @@ def _is_self_presence(presence: ET.Element) -> bool:
     if muc_x is None:
         return False
     return any(
-        _local(status.tag) == "status" and status.get("code") == "110" for status in muc_x
+        _local(status.tag) == "status" and status.get("code") == "110"
+        for status in muc_x
     )
 
 
@@ -269,7 +291,10 @@ async def _open_authenticated_stream(
     await ws.send(f'<open xmlns="{_NS_FRAMING}" to="{xmpp_domain}" version="1.0"/>')
     opened = await _recv_stanza(ws, timeout)
     if _local(opened.tag) == "error":
-        msg = f"Stream error opening to {xmpp_domain!r}: {ET.tostring(opened, encoding='unicode')}"
+        msg = (
+            f"Stream error opening to {xmpp_domain!r}: "
+            f"{ET.tostring(opened, encoding='unicode')}"
+        )
         raise JitsiConnectionError(msg)
     await _recv_stanza(ws, timeout)  # <stream:features>
 
@@ -288,7 +313,10 @@ async def _open_authenticated_stream(
     await _recv_stanza(ws, timeout)  # <stream:features> (bind, ...)
 
     # Bind a resource so we have a full JID to send IQs from.
-    await ws.send(f'<iq xmlns="jabber:client" type="set" id="bind1"><bind xmlns="{_NS_BIND}"/></iq>')
+    await ws.send(
+        '<iq xmlns="jabber:client" type="set" id="bind1">'
+        f'<bind xmlns="{_NS_BIND}"/></iq>'
+    )
     await _recv_stanza(ws, timeout)
 
 
@@ -378,7 +406,9 @@ class JitsiXmppConnection:
             msg = f"Could not open a WebSocket connection to {ws_url!r}: {exc}"
             raise JitsiConnectionError(msg) from exc
         try:
-            await _open_authenticated_stream(self.ws, self._anonymous_domain, self.timeout)
+            await _open_authenticated_stream(
+                self.ws, self._anonymous_domain, self.timeout
+            )
 
             await self.ws.send(
                 f'<presence xmlns="jabber:client" to="{self._occupant_jid}">'
@@ -422,7 +452,9 @@ class JitsiXmppConnection:
             raise
         except _TRANSPORT_ERRORS as exc:
             await self.close()
-            msg = f"Lost the XMPP connection while joining {self._occupant_jid!r}: {exc}"
+            msg = (
+                f"Lost the XMPP connection while joining {self._occupant_jid!r}: {exc}"
+            )
             raise JitsiConnectionError(msg) from exc
         except BaseException:
             await self.close()
@@ -478,7 +510,7 @@ class JitsiXmppConnection:
         """Return the number of participants currently in the room."""
         return len(await self.get_participants())
 
-    async def __aenter__(self) -> JitsiXmppConnection:
+    async def __aenter__(self) -> Self:
         await self.open()
         return self
 

@@ -66,10 +66,12 @@ from inspect_jitsi import (
     is_room_created,
 )
 
-get_participant_count("https://meet.example.com/SomeRoomName")   # -> 2
-get_participants("https://meet.example.com/SomeRoomName")        # -> [Participant(...), ...]
-diagnose_jitsi_access("https://meet.example.com/SomeRoomName")   # -> DiagnosisResult(...)
-is_room_created("https://meet.example.com/SomeRoomName")         # -> True
+get_participant_count("https://meet.example.com/SomeRoomName")  # -> 2
+get_participants("https://meet.example.com/SomeRoomName")  # -> [Participant(...), ...]
+diagnose_jitsi_access(
+    "https://meet.example.com/SomeRoomName"
+)  # -> DiagnosisResult(...)
+is_room_created("https://meet.example.com/SomeRoomName")  # -> True
 ```
 
 | Function | Returns |
@@ -98,10 +100,12 @@ wrappers above; it's fully `async`/`await`:
 import asyncio
 from inspect_jitsi import JitsiConference
 
+
 async def main():
     async with JitsiConference("https://meet.example.com/SomeRoomName") as conference:
-        print(await conference.is_created())      # -> True, without joining
+        print(await conference.is_created())  # -> True, without joining
         print(await conference.get_participants())
+
 
 asyncio.run(main())
 ```

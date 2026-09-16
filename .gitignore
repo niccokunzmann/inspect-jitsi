@@ -13,3 +13,4 @@ inspect_jitsi/_version.py
 /build
 /dist
 .pytest_cache/
+/.prompts/

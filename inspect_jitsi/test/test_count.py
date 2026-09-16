@@ -14,7 +14,7 @@
 
 from __future__ import annotations
 
-import pytest
+from typing import TYPE_CHECKING
 
 from inspect_jitsi.sync import get_participant_count
 from inspect_jitsi.test.conftest import (
@@ -25,6 +25,9 @@ from inspect_jitsi.test.conftest import (
     join_script,
 )
 
+if TYPE_CHECKING:
+    import pytest
+
 NICK = "probe-test"
 
 
@@ -32,7 +35,11 @@ def test_get_participant_count(fake_server) -> None:
     fake_server([*handshake_script(), *join_script(NICK, ("alice",))])
 
     count = get_participant_count(
-        CONFERENCE_URL, NICK, anonymous_domain=XMPP_DOMAIN, muc_domain=MUC_DOMAIN, timeout=1
+        CONFERENCE_URL,
+        NICK,
+        anonymous_domain=XMPP_DOMAIN,
+        muc_domain=MUC_DOMAIN,
+        timeout=1,
     )
 
     assert count == 1
@@ -42,7 +49,11 @@ def test_get_participant_count_empty_room(fake_server) -> None:
     fake_server([*handshake_script(), *join_script(NICK)])
 
     count = get_participant_count(
-        CONFERENCE_URL, NICK, anonymous_domain=XMPP_DOMAIN, muc_domain=MUC_DOMAIN, timeout=1
+        CONFERENCE_URL,
+        NICK,
+        anonymous_domain=XMPP_DOMAIN,
+        muc_domain=MUC_DOMAIN,
+        timeout=1,
     )
 
     assert count == 0
@@ -72,7 +83,7 @@ def test_get_participant_count_with_random_nick(
     class _FixedUUID:
         hex = "deadbeefcafef00d"
 
-    monkeypatch.setattr("inspect_jitsi.xmpp.connection.uuid.uuid4", lambda: _FixedUUID())
+    monkeypatch.setattr("inspect_jitsi.xmpp.connection.uuid.uuid4", _FixedUUID)
     random_nick = f"inspect-jitsi-{_FixedUUID.hex[:8]}"
 
     fake_server([*handshake_script(), *join_script(random_nick, ("alice", "bob"))])
@@ -81,4 +92,4 @@ def test_get_participant_count_with_random_nick(
         CONFERENCE_URL, anonymous_domain=XMPP_DOMAIN, muc_domain=MUC_DOMAIN, timeout=1
     )
 
-    assert count == 2  # noqa: PLR2004
+    assert count == 2
