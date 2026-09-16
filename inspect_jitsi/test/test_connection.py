@@ -81,20 +81,18 @@ async def test_open_counts_only_humans(fake_server) -> None:
     assert ws.closed
 
 
-async def test_join_presence_discloses_default_display_name(fake_server) -> None:
-    """Without an explicit `name`, the join presence discloses "inspect-jitsi"
-    as the XEP-0172 display name, rather than none at all (which Jitsi's web
-    client shows to others as the generic "Fellow Jitsier")."""
+async def test_join_presence_discloses_no_display_name_by_default(fake_server) -> None:
+    """Without an explicit `name`, the library discloses no XEP-0172 display
+    name at all - same as any other Jitsi client that sends none (Jitsi's
+    web client then shows the generic "Fellow Jitsier" to other occupants).
+    Only the `inspect-jitsi` CLI passes its own default explicitly."""
     ws = fake_server([*handshake_script(), *join_script(NICK)])
 
     async with make_connection() as conn:
-        assert conn.name == "inspect-jitsi"
+        assert conn.name is None
 
     join_presence = next(s for s in ws.sent if "<x xmlns=" in s)
-    assert (
-        '<nick xmlns="http://jabber.org/protocol/nick">inspect-jitsi</nick>'
-        in join_presence
-    )
+    assert "<nick" not in join_presence
 
 
 async def test_join_presence_discloses_a_custom_display_name(fake_server) -> None:

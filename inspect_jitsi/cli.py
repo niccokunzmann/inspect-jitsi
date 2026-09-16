@@ -38,6 +38,7 @@ from inspect_jitsi.sync import (
     get_participants,
     is_room_created,
 )
+from inspect_jitsi.xmpp.connection import DEFAULT_NAME
 
 app = typer.Typer(
     add_completion=False,
@@ -50,7 +51,7 @@ app = typer.Typer(
 )
 
 NameOption = typer.Option(
-    "inspect-jitsi",
+    DEFAULT_NAME,
     "--name",
     envvar="INSPECT_JITSI_NAME",
     help="Display name to disclose when joining the room.",

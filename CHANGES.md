@@ -7,11 +7,12 @@
   directly - a conference URL is arbitrary, caller-supplied input, so a
   malicious server could otherwise send a billion-laughs/XXE-style XML bomb
   that got silently expanded instead of rejected.
-- Add a `name` option (CLI `--name`, `INSPECT_JITSI_NAME` environment
-  variable, and `name=` on `get_participant_count`/`get_participants`/
+- Add a new parameter (`name=` on `get_participant_count`/`get_participants`/
   `JitsiConference`/`JitsiXmppConnection`) to set the display name disclosed
-  when joining a room - defaults to `"inspect-jitsi"` instead of Jitsi's own
-  "Fellow Jitsier" fallback for occupants with no display name.
+  when joining a room.
+- The `inspect-jitsi` command joins a conference with the name  "inspect-jitsi" by default.
+  Override it with `--name` or the `INSPECT_JITSI_NAME` environment
+  variable.
 
 ## 0.0.2
 

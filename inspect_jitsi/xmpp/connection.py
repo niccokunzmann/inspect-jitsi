@@ -88,12 +88,15 @@ FOCUS_NICK = "focus"
 """MUC nickname jicofo always joins under - not a human participant."""
 
 DEFAULT_NAME = "inspect-jitsi"
-"""Display name (XEP-0172 <nick/>) used to join a room when none is given.
+"""Display name (XEP-0172 <nick/>) the `inspect-jitsi` command line tool
+discloses when its own `--name`/`INSPECT_JITSI_NAME` isn't given.
 
-Jitsi's own web client falls back to showing "Fellow Jitsier" for an
-occupant that discloses no display name at all - sending this instead makes
-it clear in the room's participant list that the join was this tool
-inspecting the room, not a person.
+Not applied automatically by this library - `JitsiXmppConnection` and
+`JitsiConference` disclose no display name at all by default (`name=None`),
+same as any other Jitsi client that sends no XEP-0172 `<nick/>` (Jitsi's own
+web client then shows the generic "Fellow Jitsier" to other occupants). The
+CLI passes this constant explicitly instead of leaving that choice to the
+person running it.
 """
 
 ROOM_CREATION_RESTRICTED = "not-allowed"
@@ -325,9 +328,9 @@ class JitsiXmppConnection:
 
     Connects over the WebSocket endpoint the Jitsi web client itself uses,
     joins the room's MUC under the given nickname (disclosing `name` as its
-    XEP-0172 display name), and keeps a live roster of the other
-    participants (updated as they join/leave for as long as the connection
-    stays open).
+    XEP-0172 display name, if given - no display name is disclosed by
+    default), and keeps a live roster of the other participants (updated as
+    they join/leave for as long as the connection stays open).
 
     Use as an async context manager::
 
@@ -350,7 +353,7 @@ class JitsiXmppConnection:
         self.conference_url = conference_url
         self.ws_domain, self.room = parse_conference_url(conference_url)
         self.nick = nick or f"inspect-jitsi-{uuid.uuid4().hex[:8]}"
-        self.name = name or DEFAULT_NAME
+        self.name = name
         self.timeout = timeout
         self._anonymous_domain = anonymous_domain
         self._muc_domain = muc_domain
@@ -410,10 +413,15 @@ class JitsiXmppConnection:
                 self.ws, self._anonymous_domain, self.timeout
             )
 
+            nick_element = (
+                f'<nick xmlns="{_NS_NICK}">{escape(self.name)}</nick>'
+                if self.name is not None
+                else ""
+            )
             await self.ws.send(
                 f'<presence xmlns="jabber:client" to="{self._occupant_jid}">'
                 f'<x xmlns="{_NS_MUC}"/>'
-                f'<nick xmlns="{_NS_NICK}">{escape(self.name)}</nick>'
+                f"{nick_element}"
                 "</presence>"
             )
 

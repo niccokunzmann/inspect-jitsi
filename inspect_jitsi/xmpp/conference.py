@@ -97,8 +97,8 @@ class JitsiConference:
         return self._connection.nick
 
     @property
-    def name(self) -> str:
-        """The display name (XEP-0172) disclosed when joining."""
+    def name(self) -> str | None:
+        """The display name (XEP-0172) disclosed when joining, if any."""
         return self._connection.name
 
     async def open(self) -> None:

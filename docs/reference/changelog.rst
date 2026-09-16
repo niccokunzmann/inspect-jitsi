@@ -1,6 +1,6 @@
-=========
-Changelog
-=========
+====================
+Versions and Changes
+====================
 
 All notable changes to ``inspect-jitsi`` are documented in :file:`CHANGES.md` at the repository root.
 

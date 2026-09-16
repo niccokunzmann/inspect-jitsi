@@ -61,7 +61,7 @@ def get_participant_count(
         conference_url: e.g. "https://meet.example.com/SomeRoomName".
         nick: the MUC nickname to join under. Random if not given.
         name: the display name (XEP-0172) to disclose when joining.
-            Defaults to "inspect-jitsi" if not given.
+            No display name is disclosed if not given.
         anonymous_domain: override the XMPP domain used for stream/login.
             Auto-discovered from the site's /config.js if not given.
         muc_domain: override the MUC component domain (e.g. "muc.meet.jitsi"
