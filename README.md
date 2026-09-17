@@ -9,6 +9,9 @@
 Tools for inspecting a running [Jitsi Meet](https://jitsi.org/) deployment.
 
 - [Documentation](https://inspect-jitsi.readthedocs.io/en/latest/)
-- [Changelog](CHANGES.md)
+- [Changelog](https://inspect-jitsi.readthedocs.io/en/latest/reference/changelog.html)
 - [PyPI](https://pypi.org/project/inspect-jitsi/)
 - [Source](https://github.com/niccokunzmann/inspect-jitsi)
+- [License](https://github.com/niccokunzmann/inspect-jitsi/blob/main/LICENSE)
+
+This project was built with the help of AI coding assistants.
