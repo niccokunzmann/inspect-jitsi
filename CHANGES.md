@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 - Add the `inspect-jitsi monitor` command: it stays connected to a room, prints
   a line of JSON whenever the room, its participants or its status change, and

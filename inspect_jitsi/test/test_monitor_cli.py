@@ -16,6 +16,7 @@ top of a fake XMPP server."""
 from __future__ import annotations
 
 import json
+import re
 
 import pytest
 
@@ -252,17 +253,34 @@ def test_timeout_flag_environment_and_default(
     assert seen["timeout"] == expected
 
 
-def test_help_links_to_the_docs_page_and_lists_the_options() -> None:
-    result = runner.invoke(cli.app, ["monitor", "--help"])
+ANSI_ESCAPES = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
+
+def help_text(*args: str) -> str:
+    """The `--help` output as plain text, whatever the environment.
+
+    CI systems (GitHub Actions, FORCE_COLOR, ...) make typer's rich output
+    emit colors and adapt to the terminal width; ask for plain output and
+    strip any escape codes that come anyway.
+    """
+    result = runner.invoke(
+        cli.app,
+        [*args, "--help"],
+        env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"},
+    )
     assert result.exit_code == 0
-    flat = "".join(result.stdout.split())
-    assert "how-to/monitor-a-conference.html" in flat
-    assert "--name" in result.stdout
-    assert "--timeout" in result.stdout
-    assert "INSPECT_JITSI_TIMEOUT" in result.stdout
-    assert "INSPECT_JITSI_NAME" in result.stdout
-    assert "monitor" in runner.invoke(cli.app, ["--help"]).stdout
+    return ANSI_ESCAPES.sub("", result.stdout)
+
+
+def test_help_links_to_the_docs_page_and_lists_the_options() -> None:
+    out = help_text("monitor")
+
+    assert "how-to/monitor-a-conference.html" in "".join(out.split())
+    assert "--name" in out
+    assert "--timeout" in out
+    assert "INSPECT_JITSI_TIMEOUT" in out
+    assert "INSPECT_JITSI_NAME" in out
+    assert "monitor" in help_text()
 
 
 def test_stdout_is_written_line_by_line_as_things_happen(monkeypatch) -> None:
@@ -326,6 +344,6 @@ def test_stay_and_create_are_passed_on(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_help_describes_create_and_stay() -> None:
-    out = runner.invoke(cli.app, ["monitor", "--help"]).stdout
+    out = help_text("monitor")
     assert "--create" in out
     assert "--stay" in out
