@@ -21,6 +21,7 @@ from inspect_jitsi.xmpp.connection import (
     discover_hosts,
 )
 from inspect_jitsi.xmpp.diagnosis import DiagnosisResult
+from inspect_jitsi.xmpp.monitor import monitor_conference
 from inspect_jitsi.xmpp.participant import Participant
 
 __all__ = [
@@ -30,4 +31,5 @@ __all__ = [
     "JitsiXmppConnection",
     "Participant",
     "discover_hosts",
+    "monitor_conference",
 ]

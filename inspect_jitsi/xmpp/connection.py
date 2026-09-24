@@ -44,7 +44,6 @@ import uuid
 import xml.etree.ElementTree as ET
 from typing import Self
 from urllib.parse import urlparse
-from xml.sax.saxutils import escape
 
 import defusedxml.ElementTree as DefusedET
 import niquests
@@ -53,6 +52,13 @@ from defusedxml.common import DefusedXmlException
 from websockets.exceptions import ConnectionClosed, WebSocketException
 
 from inspect_jitsi.xmpp.participant import Participant
+from inspect_jitsi.xmpp.stanza import (
+    bind_request,
+    join_presence,
+    leave_presence,
+    sasl_anonymous,
+    stream_open,
+)
 
 __all__ = [
     "JitsiConnectionError",
@@ -61,13 +67,7 @@ __all__ = [
     "discover_hosts",
 ]
 
-_NS_FRAMING = "urn:ietf:params:xml:ns:xmpp-framing"
-_NS_SASL = "urn:ietf:params:xml:ns:xmpp-sasl"
-_NS_BIND = "urn:ietf:params:xml:ns:xmpp-bind"
-_NS_MUC = "http://jabber.org/protocol/muc"
 _NS_MUC_USER = "http://jabber.org/protocol/muc#user"
-_NS_NICK = "http://jabber.org/protocol/nick"
-_NS_DISCO_INFO = "http://jabber.org/protocol/disco#info"
 _NS_STREAM = "http://etherx.jabber.org/streams"
 
 # Anything a live WebSocket/XMPP round trip can raise below the
@@ -259,7 +259,9 @@ def _repair_unbound_stream_prefix(message: str) -> str:
     return f'<stream:{tag} xmlns:stream="{_NS_STREAM}"{rest}>{message[match.end() :]}'
 
 
-async def _recv_stanza(ws: websockets.ClientConnection, timeout: float) -> ET.Element:
+async def _recv_stanza(
+    ws: websockets.ClientConnection, timeout: float | None
+) -> ET.Element:
     try:
         async with asyncio.timeout(timeout):
             message = await ws.recv()
@@ -267,12 +269,19 @@ async def _recv_stanza(ws: websockets.ClientConnection, timeout: float) -> ET.El
         msg = f"Lost the XMPP connection while waiting for a reply: {exc}"
         raise JitsiConnectionError(msg) from exc
 
+    if isinstance(message, bytes):  # a binary frame: XMPP text is UTF-8
+        try:
+            message = message.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            msg = f"Could not parse a reply from the server: {message!r}"
+            raise JitsiConnectionError(msg) from exc
+
     try:
         return DefusedET.fromstring(message)
-    except (ET.ParseError, DefusedXmlException):
+    except (ET.ParseError, DefusedXmlException, UnicodeError):
         try:
             return DefusedET.fromstring(_repair_unbound_stream_prefix(message))
-        except (ET.ParseError, DefusedXmlException) as exc:
+        except (ET.ParseError, DefusedXmlException, UnicodeError) as exc:
             msg = f"Could not parse a reply from the server: {message!r}"
             raise JitsiConnectionError(msg) from exc
 
@@ -291,7 +300,7 @@ def _is_self_presence(presence: ET.Element) -> bool:
 async def _open_authenticated_stream(
     ws: websockets.ClientConnection, xmpp_domain: str, timeout: float
 ) -> None:
-    await ws.send(f'<open xmlns="{_NS_FRAMING}" to="{xmpp_domain}" version="1.0"/>')
+    await ws.send(stream_open(xmpp_domain))
     opened = await _recv_stanza(ws, timeout)
     if _local(opened.tag) == "error":
         msg = (
@@ -301,7 +310,7 @@ async def _open_authenticated_stream(
         raise JitsiConnectionError(msg)
     await _recv_stanza(ws, timeout)  # <stream:features>
 
-    await ws.send(f'<auth xmlns="{_NS_SASL}" mechanism="ANONYMOUS"/>')
+    await ws.send(sasl_anonymous())
     result = await _recv_stanza(ws, timeout)
     if _local(result.tag) != "success":
         msg = (
@@ -311,15 +320,12 @@ async def _open_authenticated_stream(
         raise JitsiConnectionError(msg)
 
     # Restart the stream post-auth, as required by RFC 6120.
-    await ws.send(f'<open xmlns="{_NS_FRAMING}" to="{xmpp_domain}" version="1.0"/>')
+    await ws.send(stream_open(xmpp_domain))
     await _recv_stanza(ws, timeout)  # <open>
     await _recv_stanza(ws, timeout)  # <stream:features> (bind, ...)
 
     # Bind a resource so we have a full JID to send IQs from.
-    await ws.send(
-        '<iq xmlns="jabber:client" type="set" id="bind1">'
-        f'<bind xmlns="{_NS_BIND}"/></iq>'
-    )
+    await ws.send(bind_request())
     await _recv_stanza(ws, timeout)
 
 
@@ -363,6 +369,17 @@ class JitsiXmppConnection:
         self._participants: dict[str, Participant] = {}
         self._reader_task: asyncio.Task | None = None
         self._joined = asyncio.Event()
+        self._focus_seen = False
+        self.changed = asyncio.Event()
+        """Set whenever the roster changes or the connection ends. Callers
+        clear it themselves after they've looked at the new state."""
+        self.ended = asyncio.Event()
+        """Set once the background reader stops (room closed or connection lost)."""
+        self.room_closed = False
+        """True once the room is known to be over: the MUC removed us (room
+        destroyed, we were kicked) or jicofo, the conference focus, left it."""
+        self.error: Exception | None = None
+        """Why the reader stopped, if the connection was lost."""
         self.room_created: bool | None = None
         """Whether the room existed to join. None before `open()`.
 
@@ -413,17 +430,7 @@ class JitsiXmppConnection:
                 self.ws, self._anonymous_domain, self.timeout
             )
 
-            nick_element = (
-                f'<nick xmlns="{_NS_NICK}">{escape(self.name)}</nick>'
-                if self.name is not None
-                else ""
-            )
-            await self.ws.send(
-                f'<presence xmlns="jabber:client" to="{self._occupant_jid}">'
-                f'<x xmlns="{_NS_MUC}"/>'
-                f"{nick_element}"
-                "</presence>"
-            )
+            await self.ws.send(join_presence(self._occupant_jid, self.name))
 
             # Read the initial roster inline, so a failure to join (e.g. a
             # <presence type="error">) raises here rather than being lost in
@@ -469,24 +476,43 @@ class JitsiXmppConnection:
             raise
 
     async def _read_loop(self) -> None:
-        """Continuously update the roster from incoming presence stanzas."""
+        """Continuously update the roster from incoming presence stanzas.
+
+        Waits without a timeout - a quiet room is normal here; a dead
+        connection is detected by the WebSocket's own keepalive pings.
+        """
         try:
-            while True:
-                stanza = await _recv_stanza(self.ws, self.timeout)
+            while not self.room_closed:
+                stanza = await _recv_stanza(self.ws, None)
                 if _local(stanza.tag) != "presence" or stanza.get("type") == "error":
                     continue
                 self._handle_presence(stanza)
-        except (asyncio.CancelledError, ConnectionClosed):
+        except asyncio.CancelledError:
             pass
+        except Exception as exc:  # noqa: BLE001
+            # Whatever went wrong, the monitor must learn the reader stopped
+            # (`ended`) rather than have this background task die silently.
+            self.error = exc
+        finally:
+            self.ended.set()
+            self.changed.set()
 
     def _handle_presence(self, stanza: ET.Element) -> None:
         from_jid = stanza.get("from")
-        if not from_jid or from_jid.rsplit("/", 1)[-1] == FOCUS_NICK:
+        if not from_jid:
             return
-        if stanza.get("type") == "unavailable":
+        unavailable = stanza.get("type") == "unavailable"
+        if from_jid == self._occupant_jid and unavailable:
+            self.room_closed = True
+        elif from_jid.rsplit("/", 1)[-1] == FOCUS_NICK:
+            if unavailable and self._focus_seen:
+                self.room_closed = True
+            self._focus_seen = not unavailable
+        elif unavailable:
             self._participants.pop(from_jid, None)
         else:
             self._participants[from_jid] = Participant.from_presence(stanza)
+        self.changed.set()
 
     async def close(self) -> None:
         """Leave the room (if joined) and close the connection."""
@@ -501,18 +527,23 @@ class JitsiXmppConnection:
                 # occupant - room_created is False (or still None, if we
                 # never got as far as sending the join presence at all).
                 if self._occupant_jid is not None and self.room_created:
-                    await ws.send(
-                        f'<presence xmlns="jabber:client" type="unavailable" '
-                        f'to="{self._occupant_jid}"/>'
-                    )
+                    await ws.send(leave_presence(self._occupant_jid))
             except ConnectionClosed:
                 pass
             finally:
                 await ws.close()
 
+    def other_participants(self) -> list[Participant]:
+        """The participants known to be in the room, in the order they joined.
+
+        Not counting this connection itself. Synchronous, unlike
+        :meth:`get_participants`.
+        """
+        return [p for jid, p in self._participants.items() if jid != self._occupant_jid]
+
     async def get_participants(self) -> list[Participant]:
         """Return the participants currently known to be in the room."""
-        return [p for jid, p in self._participants.items() if jid != self._occupant_jid]
+        return self.other_participants()
 
     async def get_participant_count(self) -> int:
         """Return the number of participants currently in the room."""

@@ -75,6 +75,9 @@ inspect-jitsi = "inspect_jitsi.cli:main"
 [tool.pytest.ini_options]
 testpaths = ["inspect_jitsi"]
 asyncio_mode = "auto"
+markers = [
+    "flaky: depends on timing (short sleeps and timeouts) and can fail on a slow or heavily loaded machine; a failure is worth a re-run before it is worth an investigation",
+]
 
 [tool.hatch.metadata.hooks.vcs.urls]
 #[project.urls]

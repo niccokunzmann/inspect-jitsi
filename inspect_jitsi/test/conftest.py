@@ -251,6 +251,25 @@ class FakeConnect:
         pass
 
 
+class RefusedConnect:
+    """Mimics `websockets.connect(...)` to a server that refuses the connection:
+    the error surfaces when it is awaited/entered, like the real thing."""
+
+    def __await__(self):
+        async def _refuse() -> None:
+            msg = "connection refused"
+            raise ConnectionRefusedError(msg)
+
+        return _refuse().__await__()
+
+    async def __aenter__(self) -> None:
+        msg = "connection refused"
+        raise ConnectionRefusedError(msg)
+
+    async def __aexit__(self, *exc_info: object) -> None:
+        pass
+
+
 class FakeConfigJsResponse:
     def __init__(self, text: str) -> None:
         self.text = text

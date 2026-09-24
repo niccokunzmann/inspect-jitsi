@@ -26,9 +26,6 @@ from typing import TYPE_CHECKING, Self
 import websockets
 
 from inspect_jitsi.xmpp.connection import (
-    _NS_DISCO_INFO,
-    _NS_FRAMING,
-    _NS_SASL,
     _TRANSPORT_ERRORS,
     ROOM_NOT_FOUND,
     JitsiConnectionError,
@@ -42,6 +39,7 @@ from inspect_jitsi.xmpp.connection import (
     resolve_domains,
 )
 from inspect_jitsi.xmpp.diagnosis import DiagnosisResult
+from inspect_jitsi.xmpp.stanza import disco_info_query, sasl_anonymous, stream_open
 
 if TYPE_CHECKING:
     from inspect_jitsi.xmpp.participant import Participant
@@ -140,10 +138,7 @@ class JitsiConference:
         try:
             async with connect as ws:
                 await _open_authenticated_stream(ws, xmpp_domain, self.timeout)
-                await ws.send(
-                    f'<iq xmlns="jabber:client" type="get" to="{room_jid}" id="disco1">'
-                    f'<query xmlns="{_NS_DISCO_INFO}"/></iq>'
-                )
+                await ws.send(disco_info_query(room_jid))
                 stanza = await _recv_stanza(ws, self.timeout)
         except JitsiConnectionError:
             raise
@@ -199,9 +194,7 @@ class JitsiConference:
             ws_url, subprotocols=["xmpp"], open_timeout=self.timeout
         )
         async with connect as ws:
-            await ws.send(
-                f'<open xmlns="{_NS_FRAMING}" to="{xmpp_domain}" version="1.0"/>'
-            )
+            await ws.send(stream_open(xmpp_domain))
             opened = await _recv_stanza(ws, self.timeout)
             if _local(opened.tag) == "error":
                 result.domain_recognized = False
@@ -221,7 +214,7 @@ class JitsiConference:
                 result.error = "Server does not offer the ANONYMOUS SASL mechanism."
                 return
 
-            await ws.send(f'<auth xmlns="{_NS_SASL}" mechanism="ANONYMOUS"/>')
+            await ws.send(sasl_anonymous())
             auth_result = await _recv_stanza(ws, self.timeout)
             if _local(auth_result.tag) == "success":
                 result.anonymous_login_ok = True

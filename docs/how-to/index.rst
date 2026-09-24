@@ -7,3 +7,4 @@ Task-oriented guides for using ``inspect-jitsi``. See :doc:`../reference/cli` fo
 .. toctree::
 
     check-a-conference
+    monitor-a-conference

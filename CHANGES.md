@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+- Add the `inspect-jitsi monitor` command: it stays connected to a room, prints
+  a line of JSON whenever the room, its participants or its status change, and
+  exits when the room is closed. It reconnects after a lost connection, see
+  `--timeout` / `INSPECT_JITSI_TIMEOUT`. It checks that the room exists before
+  joining it (`--create` skips that), and leaves when it is the only one in
+  the room (`--stay` keeps it there).
+- Add `monitor_room` (blocking iterator) and `monitor_conference` (async
+  generator) to monitor a room from Python, as the command does.
+- Fix: every XMPP stanza the library sends is now built with
+  `xml.etree.ElementTree` instead of by pasting values into strings. A display
+  name, nickname, room name or domain containing quotes, `<`, `&`, control
+  characters or undecodable bytes can no longer produce malformed XML or
+  change the structure of a stanza. Characters XML forbids are sent as U+FFFD.
+  A reply that is not valid text is now a `JitsiConnectionError`.
+- Fix: the background reader of `JitsiXmppConnection` no longer stops after
+  `timeout` seconds of a quiet room.
+
 ## 0.1.0
 
 - Fix: XMPP stanzas received from the server are now parsed with

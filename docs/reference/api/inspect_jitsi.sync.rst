@@ -10,6 +10,7 @@ Submodules
    inspect_jitsi.sync.count
    inspect_jitsi.sync.created
    inspect_jitsi.sync.diagnose
+   inspect_jitsi.sync.monitor
    inspect_jitsi.sync.participants
 
 Module contents

@@ -19,6 +19,7 @@ from inspect_jitsi.sync import (
     get_participant_count,
     get_participants,
     is_room_created,
+    monitor_room,
 )
 from inspect_jitsi.xmpp import (
     DiagnosisResult,
@@ -27,6 +28,7 @@ from inspect_jitsi.xmpp import (
     JitsiXmppConnection,
     Participant,
     discover_hosts,
+    monitor_conference,
 )
 
 __all__ = [
@@ -40,4 +42,6 @@ __all__ = [
     "get_participant_count",
     "get_participants",
     "is_room_created",
+    "monitor_conference",
+    "monitor_room",
 ]

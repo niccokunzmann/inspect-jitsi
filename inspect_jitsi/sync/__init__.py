@@ -17,6 +17,7 @@ from __future__ import annotations
 from inspect_jitsi.sync.count import get_participant_count
 from inspect_jitsi.sync.created import is_room_created
 from inspect_jitsi.sync.diagnose import diagnose_jitsi_access
+from inspect_jitsi.sync.monitor import monitor_room
 from inspect_jitsi.sync.participants import get_participants
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "get_participant_count",
     "get_participants",
     "is_room_created",
+    "monitor_room",
 ]

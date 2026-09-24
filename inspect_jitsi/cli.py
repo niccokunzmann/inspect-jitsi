@@ -12,7 +12,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """Command line interface.
 
-``inspect-jitsi count|participants|diagnose|created <conference-url>``.
+``inspect-jitsi count|participants|diagnose|created|monitor <conference-url>``.
 Requires the "cli" extra: ``pip install inspect-jitsi[cli]``.
 
 ``count``/``participants`` join the room under a display name, set via
@@ -22,7 +22,11 @@ to "inspect-jitsi".
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
+import os
+import sys
 
 try:
     import typer
@@ -38,7 +42,8 @@ from inspect_jitsi.sync import (
     get_participants,
     is_room_created,
 )
-from inspect_jitsi.xmpp.connection import DEFAULT_NAME
+from inspect_jitsi.xmpp.connection import DEFAULT_NAME, parse_conference_url
+from inspect_jitsi.xmpp.monitor import monitor_conference
 
 app = typer.Typer(
     add_completion=False,
@@ -55,6 +60,11 @@ NameOption = typer.Option(
     "--name",
     envvar="INSPECT_JITSI_NAME",
     help="Display name to disclose when joining the room.",
+)
+
+
+MONITOR_DOCS = (
+    "https://inspect-jitsi.readthedocs.io/en/latest/how-to/monitor-a-conference.html"
 )
 
 
@@ -112,6 +122,71 @@ def created(
     if json_output:
         typer.echo(json.dumps(exists))
     raise typer.Exit(0 if exists else 1)
+
+
+async def _monitor(
+    conference_url: str, name: str, timeout: float, *, create: bool, stay: bool
+) -> None:
+    async for state in monitor_conference(
+        conference_url, name=name, timeout=timeout, create=create, stay=stay
+    ):
+        typer.echo(json.dumps(state))
+
+
+@app.command(
+    help=(
+        "Follow a room until it is closed, printing a JSON line on every change."
+        f"\n\nDocumentation: {MONITOR_DOCS}"
+    )
+)
+def monitor(
+    conference_url: str,
+    name: str = NameOption,
+    create: bool = typer.Option(
+        False,
+        "--create",
+        help=(
+            "Join the room even if it does not exist, which creates it if the "
+            "server allows that. By default a missing room is reported as "
+            "closed without joining it."
+        ),
+    ),
+    stay: bool = typer.Option(
+        False,
+        "--stay",
+        help=(
+            "Stay in the room and keep it open when nobody else is in it. "
+            "By default the monitor leaves and reports the room as closed."
+        ),
+    ),
+    timeout: float = typer.Option(
+        60,
+        "--timeout",
+        envvar="INSPECT_JITSI_TIMEOUT",
+        min=0,
+        help=(
+            "Seconds to keep trying to reconnect after the connection is lost. "
+            "0 disables reconnecting."
+        ),
+    ),
+) -> None:
+    try:
+        parse_conference_url(conference_url)
+    except ValueError as exc:
+        typer.echo(f"Invalid conference URL: {exc}", err=True)
+        raise typer.Exit(2) from exc
+    try:
+        asyncio.run(_monitor(conference_url, name, timeout, create=create, stay=stay))
+    except KeyboardInterrupt:
+        raise typer.Exit(130) from None
+    except BrokenPipeError:
+        # The reader of our output went away. Point stdout at /dev/null so
+        # Python's own flush at exit doesn't print another error.
+        with contextlib.suppress(OSError, ValueError):
+            os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        raise typer.Exit(130) from None
+    except Exception as exc:  # noqa: BLE001
+        _fail("monitor the room", conference_url, exc)
 
 
 def main() -> None:
