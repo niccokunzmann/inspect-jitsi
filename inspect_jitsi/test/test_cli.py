@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 import pytest
 
@@ -389,7 +390,9 @@ def test_avatar_and_no_avatar_conflict(tmp_path) -> None:
 def test_shell_completion_is_available_on_every_command() -> None:
     """Completion must work out of the box - `add_completion` defaults to
     True, but this pins it down so a future refactor can't flip it back."""
-    root_help = runner.invoke(cli.app, ["--help"]).stdout
+    # CI may force colour, and rich then styles the dashes separately from the
+    # option name - compare the text without the escape codes.
+    root_help = re.sub(r"\x1b\[[0-9;]*m", "", runner.invoke(cli.app, ["--help"]).stdout)
     assert "--install-completion" in root_help
     assert "--show-completion" in root_help
 

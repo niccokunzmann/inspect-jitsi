@@ -149,7 +149,7 @@ class Feed:
         except StopAsyncIteration:
             return END
 
-    async def quiet(self, timeout: float = 0.05) -> None:
+    async def quiet(self, timeout: float = 0.02) -> None:
         with pytest.raises(TimeoutError):
             await self.next(timeout)
 
@@ -607,7 +607,7 @@ async def test_emitted_order_follows_the_model_and_only_real_changes_print(
                 ws.push(presence(nick, role=role))
                 known[nick] = role
             if list(known.items()) == before:
-                await feed.quiet(0.02)
+                await feed.quiet(0.005)
             else:
                 state = await feed.next()
                 assert nicks(state) == list(known)
@@ -634,7 +634,7 @@ async def test_same_display_name_gives_two_entries_in_join_order(server) -> None
 
 def test_monitor_room_raises_like_the_async_api(server) -> None:
     with pytest.raises(JitsiConnectionError):
-        next(monitor_room(CONFERENCE_URL, connect_timeout=1))
+        next(monitor_room(CONFERENCE_URL, connect_timeout=0.05))
 
 
 def test_monitor_room_yields_every_state_and_finishes(server) -> None:
