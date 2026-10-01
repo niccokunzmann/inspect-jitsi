@@ -91,8 +91,8 @@ def avatar_data_uri(path: str | Path) -> str:
             content).
 
     Returns:
-        A `data:<mime-type>;base64,...` URI, suitable as `avatar_url` on
-        `inspect_jitsi.xmpp.JitsiXmppConnection`/`JitsiConference` or the
+        A ``data:<mime-type>;base64,...`` URI, suitable as `avatar_url` on
+        `inspect_jitsi.xmpp.JitsiXmppConnection`, `JitsiConference` or the
         `avatar_url=` parameter elsewhere in this package.
 
     Raises:

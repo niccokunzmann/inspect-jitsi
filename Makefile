@@ -47,6 +47,11 @@ format: .venv  ## Format the code base with ruff, auto-fixing what it can
 test: .venv  ## Run the test suite
 	$(PYTHON) -m pytest
 
+.PHONY: install
+install:  ## Install the inspect-jitsi command line tool (editable) with pipx and enable its shell completion
+	pipx install --force --editable ".[cli]"
+	inspect-jitsi --install-completion
+
 .PHONY: dist
 dist: .venv  ## Build the sdist and wheel into dist/
 	$(PYTHON) -m build
