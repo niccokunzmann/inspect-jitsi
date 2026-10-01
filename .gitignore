@@ -14,3 +14,4 @@ inspect_jitsi/_version.py
 /dist
 .pytest_cache/
 /.prompts/
+uv.lock

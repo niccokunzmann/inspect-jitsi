@@ -67,6 +67,7 @@ class JitsiConference:
         nick: str | None = None,
         *,
         name: str | None = None,
+        avatar_url: str | None = None,
         anonymous_domain: str | None = None,
         muc_domain: str | None = None,
         timeout: float = 10,
@@ -79,6 +80,7 @@ class JitsiConference:
             conference_url,
             nick,
             name=name,
+            avatar_url=avatar_url,
             anonymous_domain=anonymous_domain,
             muc_domain=muc_domain,
             timeout=timeout,
@@ -98,6 +100,11 @@ class JitsiConference:
     def name(self) -> str | None:
         """The display name (XEP-0172) disclosed when joining, if any."""
         return self._connection.name
+
+    @property
+    def avatar_url(self) -> str | None:
+        """The avatar disclosed when joining, if any (see `Participant.avatar_url`)."""
+        return self._connection.avatar_url
 
     async def open(self) -> None:
         """Connect and join the conference."""

@@ -29,7 +29,7 @@ runner = CliRunner()
 
 
 def test_count_prints_the_participant_count(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(cli, "get_participant_count", lambda url, name: 3)
+    monkeypatch.setattr(cli, "get_participant_count", lambda url, name, avatar_url: 3)
 
     result = runner.invoke(cli.app, ["count", "https://meet.example.com/room"])
 
@@ -40,7 +40,7 @@ def test_count_prints_the_participant_count(monkeypatch: pytest.MonkeyPatch) -> 
 def test_count_defaults_to_inspect_jitsi_name(monkeypatch: pytest.MonkeyPatch) -> None:
     seen = {}
 
-    def fake_get_participant_count(_url: str, name: str) -> int:
+    def fake_get_participant_count(_url: str, name: str, avatar_url: str | None) -> int:
         seen["name"] = name
         return 0
 
@@ -54,7 +54,7 @@ def test_count_defaults_to_inspect_jitsi_name(monkeypatch: pytest.MonkeyPatch) -
 def test_count_accepts_name_option(monkeypatch: pytest.MonkeyPatch) -> None:
     seen = {}
 
-    def fake_get_participant_count(_url: str, name: str) -> int:
+    def fake_get_participant_count(_url: str, name: str, avatar_url: str | None) -> int:
         seen["name"] = name
         return 0
 
@@ -70,7 +70,7 @@ def test_count_accepts_name_option(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_count_accepts_name_from_env_var(monkeypatch: pytest.MonkeyPatch) -> None:
     seen = {}
 
-    def fake_get_participant_count(_url: str, name: str) -> int:
+    def fake_get_participant_count(_url: str, name: str, avatar_url: str | None) -> int:
         seen["name"] = name
         return 0
 
@@ -85,7 +85,9 @@ def test_count_accepts_name_from_env_var(monkeypatch: pytest.MonkeyPatch) -> Non
 def test_count_reports_failure_and_runs_diagnostics(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def failing_get_participant_count(_url: str, name: str) -> int:
+    def failing_get_participant_count(
+        _url: str, name: str, avatar_url: str | None
+    ) -> int:
         msg = "boom"
         raise RuntimeError(msg)
 
@@ -104,7 +106,7 @@ def test_count_reports_failure_and_runs_diagnostics(
 
 def test_participants_prints_indented_json(monkeypatch: pytest.MonkeyPatch) -> None:
     people = [Participant(jid="room@muc.example.com/alice", nick="alice", name="Alice")]
-    monkeypatch.setattr(cli, "get_participants", lambda url, name: people)
+    monkeypatch.setattr(cli, "get_participants", lambda url, name, avatar_url: people)
 
     result = runner.invoke(cli.app, ["participants", "https://meet.example.com/room"])
 
@@ -118,6 +120,8 @@ def test_participants_prints_indented_json(monkeypatch: pytest.MonkeyPatch) -> N
             "affiliation": None,
             "real_jid": None,
             "occupant_id": None,
+            "email": None,
+            "avatar_url": None,
         }
     ]
     assert result.stdout.count("\n") > 1  # indented, not a single compact line
@@ -126,7 +130,9 @@ def test_participants_prints_indented_json(monkeypatch: pytest.MonkeyPatch) -> N
 def test_participants_accepts_name_option(monkeypatch: pytest.MonkeyPatch) -> None:
     seen = {}
 
-    def fake_get_participants(_url: str, name: str) -> list[Participant]:
+    def fake_get_participants(
+        _url: str, name: str, avatar_url: str | None
+    ) -> list[Participant]:
         seen["name"] = name
         return []
 
@@ -142,7 +148,9 @@ def test_participants_accepts_name_option(monkeypatch: pytest.MonkeyPatch) -> No
 def test_participants_reports_failure_and_runs_diagnostics(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def failing_get_participants(_url: str, name: str) -> list[Participant]:
+    def failing_get_participants(
+        _url: str, name: str, avatar_url: str | None
+    ) -> list[Participant]:
         msg = "boom"
         raise RuntimeError(msg)
 
@@ -244,3 +252,180 @@ def test_created_json_reports_error_and_exits_2(
 
     assert result.exit_code == 2
     assert json.loads(result.output)["error"] == "boom"
+
+
+def test_count_accepts_avatar_option(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    seen = {}
+    image = tmp_path / "a.png"
+    image.write_bytes(
+        bytes.fromhex("89504e470d0a1a0a")
+    )  # PNG signature, enough to sniff
+
+    def fake_get_participant_count(_url: str, name: str, avatar_url: str | None) -> int:
+        seen["avatar_url"] = avatar_url
+        return 0
+
+    monkeypatch.setattr(cli, "get_participant_count", fake_get_participant_count)
+
+    result = runner.invoke(
+        cli.app,
+        ["count", "--avatar", str(image), "https://meet.example.com/room"],
+    )
+
+    assert result.exit_code == 0
+    assert seen["avatar_url"] == "data:image/png;base64,iVBORw0KGgo="
+
+
+def test_count_rejects_a_missing_avatar_file(monkeypatch: pytest.MonkeyPatch) -> None:
+    result = runner.invoke(
+        cli.app,
+        ["count", "--avatar", "/no/such/file.png", "https://meet.example.com/room"],
+    )
+
+    assert result.exit_code == 2
+    assert result.stdout == ""
+
+
+def test_count_rejects_an_unsupported_avatar_file(tmp_path) -> None:
+    not_an_image = tmp_path / "notes.txt"
+    not_an_image.write_text("hello")
+
+    result = runner.invoke(
+        cli.app,
+        ["count", "--avatar", str(not_an_image), "https://meet.example.com/room"],
+    )
+
+    assert result.exit_code == 2
+    assert "does not look like a supported image" in result.stderr
+
+
+def test_participants_accepts_avatar_option(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    seen = {}
+    image = tmp_path / "a.png"
+    image.write_bytes(bytes.fromhex("89504e470d0a1a0a"))
+
+    def fake_get_participants(
+        _url: str, name: str, avatar_url: str | None
+    ) -> list[Participant]:
+        seen["avatar_url"] = avatar_url
+        return []
+
+    monkeypatch.setattr(cli, "get_participants", fake_get_participants)
+
+    runner.invoke(
+        cli.app,
+        ["participants", "--avatar", str(image), "https://meet.example.com/room"],
+    )
+
+    assert seen["avatar_url"] == "data:image/png;base64,iVBORw0KGgo="
+
+
+def test_avatar_from_environment(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    seen = {}
+    image = tmp_path / "a.png"
+    image.write_bytes(bytes.fromhex("89504e470d0a1a0a"))
+
+    def fake_get_participant_count(_url: str, name: str, avatar_url: str | None) -> int:
+        seen["avatar_url"] = avatar_url
+        return 0
+
+    monkeypatch.setattr(cli, "get_participant_count", fake_get_participant_count)
+    monkeypatch.setenv("INSPECT_JITSI_AVATAR", str(image))
+
+    runner.invoke(cli.app, ["count", "https://meet.example.com/room"])
+
+    assert seen["avatar_url"] == "data:image/png;base64,iVBORw0KGgo="
+
+
+def test_default_avatar_is_the_logo(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen = {}
+
+    def fake_get_participant_count(_url: str, name: str, avatar_url: str | None) -> int:
+        seen["avatar_url"] = avatar_url
+        return 0
+
+    monkeypatch.setattr(cli, "get_participant_count", fake_get_participant_count)
+
+    runner.invoke(cli.app, ["count", "https://meet.example.com/room"])
+
+    assert seen["avatar_url"].startswith("data:image/svg+xml;base64,")
+
+
+def test_no_avatar_option_discloses_no_avatar(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen = {}
+
+    def fake_get_participant_count(_url: str, name: str, avatar_url: str | None) -> int:
+        seen["avatar_url"] = avatar_url
+        return 0
+
+    monkeypatch.setattr(cli, "get_participant_count", fake_get_participant_count)
+
+    result = runner.invoke(
+        cli.app, ["count", "--no-avatar", "https://meet.example.com/room"]
+    )
+
+    assert result.exit_code == 0
+    assert seen["avatar_url"] is None
+
+
+def test_avatar_and_no_avatar_conflict(tmp_path) -> None:
+    image = tmp_path / "a.png"
+    image.write_bytes(b"\x89PNG\r\n\x1a\n")
+    result = runner.invoke(
+        cli.app,
+        [
+            "count",
+            "--avatar",
+            str(image),
+            "--no-avatar",
+            "https://meet.example.com/room",
+        ],
+    )
+    assert result.exit_code == 2
+
+
+def test_shell_completion_is_available_on_every_command() -> None:
+    """Completion must work out of the box - `add_completion` defaults to
+    True, but this pins it down so a future refactor can't flip it back."""
+    root_help = runner.invoke(cli.app, ["--help"]).stdout
+    assert "--install-completion" in root_help
+    assert "--show-completion" in root_help
+
+    for command in ["count", "participants", "diagnose", "created", "monitor"]:
+        result = runner.invoke(cli.app, [command, "--help"])
+        assert result.exit_code == 0  # a command-level --help still works
+
+
+@pytest.mark.parametrize("command", ["count", "participants"])
+def test_avatar_accepts_a_url(monkeypatch: pytest.MonkeyPatch, command: str) -> None:
+    seen = {}
+    url = "https://example.com/me.png"
+
+    def fake(_url: str, name: str, avatar_url: str | None):
+        seen["avatar_url"] = avatar_url
+        return 0 if command == "count" else []
+
+    monkeypatch.setattr(
+        cli, "get_participant_count" if command == "count" else "get_participants", fake
+    )
+
+    result = runner.invoke(
+        cli.app, [command, "--avatar", url, "https://meet.example.com/room"]
+    )
+
+    assert result.exit_code == 0
+    assert seen["avatar_url"] == url
+
+
+def test_avatar_url_and_file_both_work(tmp_path) -> None:
+    image = tmp_path / "a.png"
+    image.write_bytes(bytes.fromhex("89504e470d0a1a0a"))
+
+    assert cli._avatar_url("http://example.com/a.jpg", False) == (  # noqa: SLF001
+        "http://example.com/a.jpg"
+    )
+    assert cli._avatar_url(str(image), False) == (  # noqa: SLF001
+        "data:image/png;base64,iVBORw0KGgo="
+    )

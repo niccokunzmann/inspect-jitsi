@@ -118,6 +118,54 @@ async def test_join_presence_escapes_a_display_name_with_xml_special_characters(
     assert ET.fromstring(join_presence) is not None
 
 
+async def test_without_avatar_url_none_is_disclosed(fake_server) -> None:
+    ws = fake_server([*handshake_script(), *join_script(NICK)])
+
+    async with make_connection() as conn:
+        assert conn.avatar_url is None
+
+    join_presence = next(s for s in ws.sent if "<x xmlns=" in s)
+    assert "avatar-url" not in join_presence
+
+
+async def test_join_presence_discloses_a_custom_avatar_url(fake_server) -> None:
+    ws = fake_server([*handshake_script(), *join_script(NICK)])
+    uri = "data:image/png;base64,aGVsbG8="
+
+    async with make_connection(avatar_url=uri) as conn:
+        assert conn.avatar_url == uri
+
+    join_presence = next(s for s in ws.sent if "<x xmlns=" in s)
+    assert f"<avatar-url>{uri}</avatar-url>" in join_presence
+    assert ET.fromstring(join_presence) is not None
+
+
+async def test_join_presence_sends_both_name_and_avatar_url(fake_server) -> None:
+    ws = fake_server([*handshake_script(), *join_script(NICK)])
+
+    async with make_connection(name="Alice", avatar_url="https://example.com/a.png"):
+        pass
+
+    join_presence = next(s for s in ws.sent if "<x xmlns=" in s)
+    root = ET.fromstring(join_presence)
+    assert [c.tag.rsplit("}", 1)[-1] for c in root] == ["x", "nick", "avatar-url"]
+
+
+async def test_another_occupants_avatar_url_is_parsed(fake_server) -> None:
+    avatar_presence = (
+        f"<presence xmlns='jabber:client' from='{ROOM_JID}/alice'>"
+        "<avatar-url>https://example.com/alice.png</avatar-url>"
+        "<x xmlns='http://jabber.org/protocol/muc#user'>"
+        "<item affiliation='member' role='participant'/></x></presence>"
+    )
+    fake_server([*handshake_script(), avatar_presence, *join_script(NICK)[-1:]])
+
+    async with make_connection() as conn:
+        (alice,) = await conn.get_participants()
+
+    assert alice.avatar_url == "https://example.com/alice.png"
+
+
 async def test_empty_room_counts_zero(fake_server) -> None:
     fake_server([*handshake_script(), *join_script(NICK)])
 

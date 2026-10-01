@@ -32,6 +32,7 @@ async def _get_participant_count_async(
     conference_url: str,
     nick: str | None,
     name: str | None,
+    avatar_url: str | None,
     anonymous_domain: str | None,
     muc_domain: str | None,
     timeout: float,
@@ -40,6 +41,7 @@ async def _get_participant_count_async(
         conference_url,
         nick,
         name=name,
+        avatar_url=avatar_url,
         anonymous_domain=anonymous_domain,
         muc_domain=muc_domain,
         timeout=timeout,
@@ -51,6 +53,7 @@ def get_participant_count(
     conference_url: str,
     nick: str | None = None,
     name: str | None = None,
+    avatar_url: str | None = None,
     anonymous_domain: str | None = None,
     muc_domain: str | None = None,
     timeout: float = 10,
@@ -62,6 +65,10 @@ def get_participant_count(
         nick: the MUC nickname to join under. Random if not given.
         name: the display name (XEP-0172) to disclose when joining.
             No display name is disclosed if not given.
+        avatar_url: the avatar to disclose when joining (see
+            `inspect_jitsi.xmpp.Participant.avatar_url`);
+            `inspect_jitsi.xmpp.avatar_data_uri` turns a local image file
+            into one. No avatar is disclosed if not given.
         anonymous_domain: override the XMPP domain used for stream/login.
             Auto-discovered from the site's /config.js if not given.
         muc_domain: override the MUC component domain (e.g. "muc.meet.jitsi"
@@ -80,6 +87,12 @@ def get_participant_count(
     """
     return asyncio.run(
         _get_participant_count_async(
-            conference_url, nick, name, anonymous_domain, muc_domain, timeout
+            conference_url,
+            nick,
+            name,
+            avatar_url,
+            anonymous_domain,
+            muc_domain,
+            timeout,
         )
     )

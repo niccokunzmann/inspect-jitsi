@@ -27,6 +27,7 @@ from inspect_jitsi.xmpp import (
     JitsiConnectionError,
     JitsiXmppConnection,
     Participant,
+    avatar_data_uri,
     discover_hosts,
     monitor_conference,
 )
@@ -37,6 +38,7 @@ __all__ = [
     "JitsiConnectionError",
     "JitsiXmppConnection",
     "Participant",
+    "avatar_data_uri",
     "diagnose_jitsi_access",
     "discover_hosts",
     "get_participant_count",

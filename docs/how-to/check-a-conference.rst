@@ -38,7 +38,9 @@ Prints the same roster as indented JSON, one entry per participant:
         "role": "participant",
         "affiliation": "none",
         "real_jid": null,
-        "occupant_id": "a1b2c3d4"
+        "occupant_id": "a1b2c3d4",
+        "email": null,
+        "avatar_url": null
       }
     ]
 
@@ -100,5 +102,15 @@ Choose the participant name inspect-jitsi uses
 
     inspect-jitsi count --name "Room Monitor" https://meet.hosted.quelltext.eu/inspect-jitsi
     INSPECT_JITSI_NAME="Room Monitor" inspect-jitsi count https://meet.hosted.quelltext.eu/inspect-jitsi
+
+Set the avatar inspect-jitsi uses
+----------------------------------
+
+By default the command line discloses the inspect-jitsi logo as its avatar. ``--avatar``, or the ``INSPECT_JITSI_AVATAR`` environment variable, discloses a local image file (png, jpeg, gif, webp, bmp or svg) or an ``http(s)`` URL of an image as inspect-jitsi's own avatar - shown to other participants instead of video. There is no server to host the image on, so it is sent as a ``data:`` URI, embedded directly in the presence inspect-jitsi sends when it joins; keep the image small (64 KiB or under), since it is sent in full on every join and every reconnect:
+
+.. code-block:: shell
+
+    inspect-jitsi count --avatar ./logo.png https://meet.hosted.quelltext.eu/inspect-jitsi
+    inspect-jitsi count --no-avatar https://meet.hosted.quelltext.eu/inspect-jitsi
 
 See :doc:`../reference/cli` for every option, including ``--json`` and the ones this guide didn't cover.

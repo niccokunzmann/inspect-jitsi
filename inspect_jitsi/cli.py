@@ -36,17 +36,19 @@ except ModuleNotFoundError as exc:
     )
     raise ModuleNotFoundError(msg) from exc
 
+from pathlib import Path
+
 from inspect_jitsi.sync import (
     diagnose_jitsi_access,
     get_participant_count,
     get_participants,
     is_room_created,
 )
+from inspect_jitsi.xmpp.avatar import avatar_data_uri
 from inspect_jitsi.xmpp.connection import DEFAULT_NAME, parse_conference_url
 from inspect_jitsi.xmpp.monitor import monitor_conference
 
 app = typer.Typer(
-    add_completion=False,
     no_args_is_help=True,
     help=(
         "Tools for inspecting a running Jitsi Meet deployment.\n\n"
@@ -61,6 +63,44 @@ NameOption = typer.Option(
     envvar="INSPECT_JITSI_NAME",
     help="Display name to disclose when joining the room.",
 )
+
+AvatarOption = typer.Option(
+    None,
+    "--avatar",
+    envvar="INSPECT_JITSI_AVATAR",
+    help=(
+        "Local image file (png/jpeg/gif/webp/bmp/svg) or http(s):// URL of an "
+        "image to disclose as the avatar when joining the room, shown instead "
+        "of video (default: the inspect-jitsi logo). A file is sent as a "
+        "data: URI, so it is re-sent on every join/reconnect - keep it small."
+    ),
+)
+
+
+NoAvatarOption = typer.Option(
+    False,
+    "--no-avatar",
+    help="Disclose no avatar at all, instead of the default inspect-jitsi logo.",
+)
+
+DEFAULT_AVATAR = Path(__file__).parent / "logo" / "logo.svg"
+
+
+def _avatar_url(avatar: str | None, no_avatar: bool) -> str | None:
+    if no_avatar:
+        if avatar is not None:
+            typer.echo("Use either --avatar or --no-avatar, not both.", err=True)
+            raise typer.Exit(2)
+        return None
+    if avatar is None:
+        avatar = str(DEFAULT_AVATAR)
+    if avatar.lower().startswith(("http://", "https://")):
+        return avatar
+    try:
+        return avatar_data_uri(avatar)
+    except (FileNotFoundError, ValueError) as exc:
+        typer.echo(f"Invalid --avatar: {exc}", err=True)
+        raise typer.Exit(2) from exc
 
 
 MONITOR_DOCS = (
@@ -78,19 +118,33 @@ def _fail(action: str, conference_url: str, exc: Exception) -> None:
 
 
 @app.command()
-def count(conference_url: str, name: str = NameOption) -> None:
+def count(
+    conference_url: str,
+    name: str = NameOption,
+    avatar: str | None = AvatarOption,
+    no_avatar: bool = NoAvatarOption,
+) -> None:
     """Print the number of participants currently in a Jitsi Meet room."""
+    avatar_url = _avatar_url(avatar, no_avatar)
     try:
-        typer.echo(get_participant_count(conference_url, name=name))
+        typer.echo(
+            get_participant_count(conference_url, name=name, avatar_url=avatar_url)
+        )
     except Exception as exc:  # noqa: BLE001
         _fail("get participant count", conference_url, exc)
 
 
 @app.command()
-def participants(conference_url: str, name: str = NameOption) -> None:
+def participants(
+    conference_url: str,
+    name: str = NameOption,
+    avatar: str | None = AvatarOption,
+    no_avatar: bool = NoAvatarOption,
+) -> None:
     """Print the participants currently in a Jitsi Meet room, as indented JSON."""
+    avatar_url = _avatar_url(avatar, no_avatar)
     try:
-        people = get_participants(conference_url, name=name)
+        people = get_participants(conference_url, name=name, avatar_url=avatar_url)
     except Exception as exc:  # noqa: BLE001
         _fail("get participants", conference_url, exc)
         return
@@ -125,10 +179,21 @@ def created(
 
 
 async def _monitor(
-    conference_url: str, name: str, timeout: float, *, create: bool, stay: bool
+    conference_url: str,
+    name: str,
+    avatar_url: str | None,
+    timeout: float,
+    *,
+    create: bool,
+    stay: bool,
 ) -> None:
     async for state in monitor_conference(
-        conference_url, name=name, timeout=timeout, create=create, stay=stay
+        conference_url,
+        name=name,
+        avatar_url=avatar_url,
+        timeout=timeout,
+        create=create,
+        stay=stay,
     ):
         typer.echo(json.dumps(state))
 
@@ -142,6 +207,8 @@ async def _monitor(
 def monitor(
     conference_url: str,
     name: str = NameOption,
+    avatar: str | None = AvatarOption,
+    no_avatar: bool = NoAvatarOption,
     create: bool = typer.Option(
         False,
         "--create",
@@ -175,8 +242,13 @@ def monitor(
     except ValueError as exc:
         typer.echo(f"Invalid conference URL: {exc}", err=True)
         raise typer.Exit(2) from exc
+    avatar_url = _avatar_url(avatar, no_avatar)
     try:
-        asyncio.run(_monitor(conference_url, name, timeout, create=create, stay=stay))
+        asyncio.run(
+            _monitor(
+                conference_url, name, avatar_url, timeout, create=create, stay=stay
+            )
+        )
     except KeyboardInterrupt:
         raise typer.Exit(130) from None
     except BrokenPipeError:

@@ -86,6 +86,8 @@ exclude_patterns = [
     "reference/_generated/changelog.md",
 ]
 html_theme = "pydata_sphinx_theme"
+html_static_path = ["_static"]
+html_favicon = "_static/logo.svg"
 html_theme_options = {
     "icon_links": [
         {
@@ -97,7 +99,11 @@ html_theme_options = {
         },
     ],
     "footer_end": ["theme-version", "sphinx-version"],
-    "logo": {"text": "inspect-jitsi"},
+    "logo": {
+        "text": "inspect-jitsi",
+        "image_light": "_static/logo.svg",
+        "image_dark": "_static/logo.svg",
+    },
     "navigation_with_keys": True,
     "show_nav_level": 2,
     "show_toc_level": 2,

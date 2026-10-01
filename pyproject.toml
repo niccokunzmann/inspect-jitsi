@@ -44,6 +44,7 @@ dependencies = [
 [project.optional-dependencies]
 cli = [
     "typer >= 0.12",
+    "shellingham >= 1.3.0", # shell auto-detection for --install-completion
 ]
 test = [
     "pytest",
@@ -94,6 +95,24 @@ source = "vcs"
 [tool.hatch.version.raw-options]
 # see https://github.com/ofek/hatch-vcs/issues/43#issuecomment-1553065222
 local_scheme = "no-local-version"
+
+[tool.hatch.build.targets.sdist]
+# Only what is needed to build, test and document the package - not the
+# virtual environments, CI/editor config, lock file or AI prompts.
+include = [
+    "/inspect_jitsi",
+    "/docs",
+    "/CHANGES.md",
+    "/LICENSE",
+    "/README.md",
+    "/pyproject.toml",
+]
+exclude = ["__pycache__", "*.pyc", "/docs/reference/_generated"]
+
+[tool.hatch.build.targets.wheel]
+# The installed package only - the tests stay in the sdist.
+packages = ["inspect_jitsi"]
+exclude = ["__pycache__", "*.pyc", "/inspect_jitsi/test"]
 
 [tool.hatch.build.hooks.vcs]
 version-file = "inspect_jitsi/_version.py"

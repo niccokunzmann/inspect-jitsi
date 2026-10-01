@@ -138,6 +138,34 @@ class TestHostileValues:
 
         only_children(root, "{http://jabber.org/protocol/muc}x")
 
+    def test_join_presence_with_avatar_url(self, value: str) -> None:
+        root = parse(stanza.join_presence(value, None, avatar_url=value))
+
+        # Unnamespaced in the XML sent - but a parser resolves that to the
+        # presence's own default namespace (jabber:client), same as for
+        # real unnamespaced extensions like <stats-id/>.
+        only_children(
+            root, "{http://jabber.org/protocol/muc}x", f"{NS_CLIENT}avatar-url"
+        )
+        avatar = root[1]
+        assert (avatar.text or "") == as_text(value)
+        only_children(avatar)
+
+    def test_join_presence_with_name_and_avatar_url(self, value: str) -> None:
+        root = parse(stanza.join_presence(value, value, avatar_url=value))
+
+        only_children(
+            root,
+            "{http://jabber.org/protocol/muc}x",
+            "{http://jabber.org/protocol/nick}nick",
+            f"{NS_CLIENT}avatar-url",
+        )
+
+    def test_join_presence_without_avatar_url(self, value: str) -> None:
+        root = parse(stanza.join_presence(value, value))
+
+        assert f"{NS_CLIENT}avatar-url" not in [child.tag for child in root]
+
     def test_leave_presence(self, value: str) -> None:
         root = parse(stanza.leave_presence(value))
 

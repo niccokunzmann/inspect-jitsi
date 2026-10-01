@@ -63,13 +63,17 @@ def _clean(value: object) -> str:
 
 def _element(
     tag: str,
-    namespace: str,
+    namespace: str | None,
     attributes: dict[str, object] | None = None,
     text: object | None = None,
 ) -> ET.Element:
     # The namespace is written as a plain `xmlns` attribute, which gives the
     # default namespace the XMPP framing wants (no `ns0:` prefixes).
-    element = ET.Element(tag, {"xmlns": namespace})
+    # `namespace=None` leaves it out, inheriting the parent's default
+    # namespace (as Jitsi's own unnamespaced presence extensions do, e.g.
+    # `<avatar-url>`/`<stats-id>` - plain children of `<presence
+    # xmlns="jabber:client">`).
+    element = ET.Element(tag, {"xmlns": namespace} if namespace is not None else {})
     for key, value in (attributes or {}).items():
         element.set(key, _clean(value))
     if text is not None:
@@ -100,12 +104,21 @@ def bind_request() -> str:
     return _serialize(iq)
 
 
-def join_presence(occupant_jid: str, name: str | None) -> str:
-    """Join a MUC as `occupant_jid`, disclosing `name` (XEP-0172) if given."""
+def join_presence(
+    occupant_jid: str, name: str | None, avatar_url: str | None = None
+) -> str:
+    """Join a MUC as `occupant_jid`.
+
+    Discloses `name` (XEP-0172 `<nick/>`) and `avatar_url` (an unnamespaced
+    `<avatar-url/>`, the same extension Jitsi's own clients use for a custom
+    avatar set through the IFrame API) to other occupants, if given.
+    """
     presence = _element("presence", _NS_CLIENT, {"to": occupant_jid})
     presence.append(_element("x", _NS_MUC))
     if name is not None:
         presence.append(_element("nick", _NS_NICK, text=name))
+    if avatar_url is not None:
+        presence.append(_element("avatar-url", None, text=avatar_url))
     return _serialize(presence)
 
 

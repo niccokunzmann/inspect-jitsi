@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.3.0
+
+- Add shell completion (bash/zsh/fish/PowerShell), for every command and
+  option, out of the box - `inspect-jitsi --install-completion` enables it.
+  Requires the new `shellingham` dependency of the `cli` extra.
+- Add `avatar_url` to `Participant`: an occupant's custom avatar (shown
+  instead of their video when it's off), if their client disclosed one -
+  returned by `count`/`participants`/`monitor` and the equivalent Python
+  functions, same as every other field. If no custom avatar was disclosed
+  but an `email` was (also now a field), `avatar_url` falls back to the
+  Gravatar URL Jitsi's own clients compute from it, matching what is
+  actually shown in a real Jitsi session.
+- Add `--avatar PATH` / `INSPECT_JITSI_AVATAR` (and the matching `avatar_url=`
+  parameter) to `count`, `participants` and `monitor`, and to
+  `get_participant_count`/`get_participants`/`monitor_room`/
+  `monitor_conference`: discloses a local image file as inspect-jitsi's own
+  avatar when joining, sent as a `data:` URI since there is no server to host
+  it on. `avatar_data_uri` turns a file into that URI on its own.
+- The command line discloses the inspect-jitsi logo as its avatar by default;
+  pass `--avatar PATH_OR_URL` to use another image or image URL or `--no-avatar` to disclose none.
+  The Python API still discloses no avatar unless `avatar_url=` is given.
+- Use the logo as the documentation logo and favicon.
+
 ## 0.2.0
 
 - Add the `inspect-jitsi monitor` command: it stays connected to a room, prints

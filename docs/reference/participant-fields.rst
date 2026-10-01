@@ -23,5 +23,9 @@ Each entry ``inspect-jitsi participants``/:func:`~inspect_jitsi.get_participants
         -   The occupant's real (non-anonymous, but still internal) JID, if disclosed.
     *   -   ``occupant_id``
         -   Stable per-session anonymous id (XEP occupant-id), if disclosed. Unlike ``jid``/``nick``, this stays the same for one occupant across the conference even where the MUC nick is a random per-join identifier - useful for telling "still the same person" from "someone new".
+    *   -   ``email``
+        -   Email address, if disclosed - Jitsi's own clients broadcast it in plain presence to resolve a Gravatar, the same way ``name`` is broadcast to be shown as a display name.
+    *   -   ``avatar_url``
+        -   The avatar shown instead of their video when it's off: either an explicit custom avatar, if disclosed, or - when only ``email`` was disclosed instead - the Gravatar URL Jitsi's own clients compute from it. Often a ``data:`` URI with the image embedded rather than a link to fetch; either way, this is exactly what that occupant's client disclosed (or implied), not fetched or decoded by this library, so treat it as untrusted input. See :doc:`../how-to/check-a-conference` for setting the avatar inspect-jitsi itself discloses.
 
 Every field but ``jid`` and ``nick`` is ``null`` when the occupant's client didn't disclose it - a deployment or client is free to omit any of them. See :class:`~inspect_jitsi.xmpp.Participant` for the authoritative, always up to date reference.

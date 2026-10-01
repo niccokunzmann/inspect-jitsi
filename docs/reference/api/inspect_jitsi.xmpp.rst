@@ -7,6 +7,7 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
+   inspect_jitsi.xmpp.avatar
    inspect_jitsi.xmpp.conference
    inspect_jitsi.xmpp.connection
    inspect_jitsi.xmpp.diagnosis

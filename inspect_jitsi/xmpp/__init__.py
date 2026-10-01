@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+from inspect_jitsi.xmpp.avatar import avatar_data_uri
 from inspect_jitsi.xmpp.conference import JitsiConference
 from inspect_jitsi.xmpp.connection import (
     JitsiConnectionError,
@@ -30,6 +31,7 @@ __all__ = [
     "JitsiConnectionError",
     "JitsiXmppConnection",
     "Participant",
+    "avatar_data_uri",
     "discover_hosts",
     "monitor_conference",
 ]

@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING
@@ -26,6 +27,20 @@ __all__ = ["Participant"]
 _NS_MUC_USER = "http://jabber.org/protocol/muc#user"
 _NS_NICK = "http://jabber.org/protocol/nick"
 _NS_OCCUPANT_ID = "urn:xmpp:occupant-id:0"
+
+_GRAVATAR_BASE_URL = "https://www.gravatar.com/avatar/"
+
+
+def _gravatar_url(email: str) -> str:
+    """The Gravatar URL Jitsi's own clients compute from a disclosed email.
+
+    `?d=404` matches what Jitsi's web client requests - a 404 from this URL
+    means Gravatar has nothing for this address, the same situation in
+    which Jitsi's own UI falls back to showing initials instead.
+    """
+    normalized = email.strip().lower()
+    digest = hashlib.md5(normalized.encode()).hexdigest()  # noqa: S324 - Gravatar's own addressing scheme, not a security use
+    return f"{_GRAVATAR_BASE_URL}{digest}?d=404"
 
 
 @dataclass(frozen=True)
@@ -58,6 +73,29 @@ class Participant:
     useful for telling "still the same person" from "someone new".
     """
 
+    email: str | None = None
+    """Email address, if disclosed - Jitsi's own clients broadcast it in
+    plain presence (unnamespaced `<email/>`) to resolve a Gravatar, the same
+    way `name` is broadcast to be shown as a display name; this is not new
+    exposure, just a readable copy of what every occupant already sees.
+    """
+
+    avatar_url: str | None = None
+    """The avatar shown instead of this occupant's video when it's off.
+
+    Either an explicit custom avatar - not a standardized XEP: Jitsi's own
+    clients send it as a plain, unnamespaced `<avatar-url/>` in presence
+    (set via the IFrame API, or by `inspect-jitsi`'s own
+    `--avatar`/`avatar_url=`), matched here by tag name alone regardless of
+    namespace - or, when only `email` was disclosed instead, the Gravatar
+    URL Jitsi's own clients compute from it (see `email`); an explicit
+    `<avatar-url/>` wins if both are present, matching Jitsi's own clients.
+    Often a `data:` URI with the image embedded rather than a link to
+    fetch. Either way, this library does not fetch or decode it - it is
+    exactly what that occupant's client disclosed (or, for the Gravatar
+    case, what it implied), so treat it as untrusted input.
+    """
+
     @classmethod
     def from_presence(cls, presence: ET.Element) -> Participant:
         """Build a Participant from a MUC <presence/> stanza."""
@@ -68,6 +106,21 @@ class Participant:
         nick_element = presence.find(f"{{{_NS_NICK}}}nick")
         if nick_element is not None and nick_element.text:
             name = nick_element.text
+
+        avatar_url = email = None
+        for child in presence:
+            # Unnamespaced in real traffic (like `<stats-id/>`), but matched
+            # by local name alone rather than relying on that.
+            local_name = child.tag.rsplit("}", 1)[-1]
+            if local_name == "avatar-url" and child.text:
+                avatar_url = child.text
+            elif local_name == "email" and child.text:
+                email = child.text
+
+        if avatar_url is None and email is not None:
+            # No custom avatar was disclosed, but an email was - the same
+            # situation in which Jitsi's own clients show a Gravatar.
+            avatar_url = _gravatar_url(email)
 
         occupant_id = None
         occupant_id_element = presence.find(f"{{{_NS_OCCUPANT_ID}}}occupant-id")
@@ -91,6 +144,8 @@ class Participant:
             affiliation=affiliation,
             real_jid=real_jid,
             occupant_id=occupant_id,
+            email=email,
+            avatar_url=avatar_url,
         )
 
     def to_dict(self) -> dict:

@@ -30,4 +30,6 @@ Confirm it is on your ``PATH``:
 
     inspect-jitsi --help
 
+Shell completion for every command and option is available out of the box - run ``inspect-jitsi --install-completion`` once to enable it in your shell (restart the shell, or source its config file, afterwards).
+
 See :doc:`how-to/index` for what to do with it next.

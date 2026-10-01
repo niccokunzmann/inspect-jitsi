@@ -21,7 +21,6 @@ from __future__ import annotations
 import asyncio
 import json
 import random
-import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Self
@@ -212,6 +211,8 @@ async def test_first_state_is_printed_on_connect_with_the_documented_schema(
         "affiliation",
         "real_jid",
         "occupant_id",
+        "email",
+        "avatar_url",
     }
 
 
@@ -661,9 +662,7 @@ DOCS = Path(__file__).parents[2] / "docs"
 @pytest.mark.skipif(not DOCS.exists(), reason="docs are not installed")
 def test_docs_example_has_the_real_schema(server) -> None:
     text = (DOCS / "how-to" / "monitor-a-conference.rst").read_text()
-    example = json.loads(
-        re.search(r"code-block:: json\n\n    (\{.*\})\n", text).group(1)
-    )
+    example = json.loads(_first_json_code_block(text))
     server.add(*join_script(NICK, ("alice",)))
 
     actual = asyncio.run(_first_state())
@@ -677,6 +676,23 @@ def test_docs_example_has_the_real_schema(server) -> None:
 async def _first_state() -> dict:
     async with Feed() as feed:
         return await feed.next()
+
+
+def _first_json_code_block(text: str) -> str:
+    """The body of the first ``.. code-block:: json`` in an rst page.
+
+    It is pretty-printed there (for readability, not because that is what
+    the command prints) - this dedents it rather than assuming one line.
+    """
+    marker = "code-block:: json\n\n"
+    start = text.index(marker) + len(marker)
+    indent = len(text[start:]) - len(text[start:].lstrip(" "))
+    lines = []
+    for line in text[start:].split("\n"):
+        if line and not line.startswith(" " * indent):
+            break
+        lines.append(line[indent:])
+    return "\n".join(lines)
 
 
 @pytest.mark.skipif(not DOCS.exists(), reason="docs are not installed")

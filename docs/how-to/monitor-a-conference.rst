@@ -11,11 +11,36 @@ Monitor a Jitsi conference from the command line
 Output
 ------
 
-The first line is printed as soon as the command has joined the room. Every further line is printed when the information changes. All lines have the same schema, one JSON document per line:
+The first line is printed as soon as the command has joined the room. Every further line is printed when the information changes. All lines have the same schema, one JSON document per line - spread over several lines and indented below only for readability here; see further down this page for what each field means and what is actually printed:
 
 .. code-block:: json
 
-    {"room": {"name": "inspect-jitsi", "url": "https://meet.hosted.quelltext.eu/inspect-jitsi", "domain": "meet.hosted.quelltext.eu", "muc_domain": "muc.meet.jitsi", "jid": "inspect-jitsi@muc.meet.jitsi"}, "participants": [{"jid": "inspect-jitsi@muc.meet.jitsi/alice", "nick": "alice", "name": "Alice", "role": "participant", "affiliation": "none", "real_jid": null, "occupant_id": null}], "status": {"open": true, "attempts": 0}}
+    {
+      "room": {
+        "name": "inspect-jitsi",
+        "url": "https://meet.hosted.quelltext.eu/inspect-jitsi",
+        "domain": "meet.hosted.quelltext.eu",
+        "muc_domain": "muc.meet.jitsi",
+        "jid": "inspect-jitsi@muc.meet.jitsi"
+      },
+      "participants": [
+        {
+          "jid": "inspect-jitsi@muc.meet.jitsi/alice",
+          "nick": "alice",
+          "name": "Alice",
+          "role": "participant",
+          "affiliation": "none",
+          "real_jid": null,
+          "occupant_id": null,
+          "email": null,
+          "avatar_url": null
+        }
+      ],
+      "status": {
+        "open": true,
+        "attempts": 0
+      }
+    }
 
 ``room``
     Where the room is. Does not change while monitoring.
@@ -67,6 +92,11 @@ If the connection is lost, the command reconnects, waiting a little longer betwe
 ``--name NAME``
     The display name disclosed when joining, the same as for the other commands. It can also be set with ``INSPECT_JITSI_NAME``.
 
+``--no-avatar``
+    Disclose no avatar instead of the default inspect-jitsi logo.
+``--avatar PATH``
+    A local image file (png, jpeg, gif, webp, bmp or svg) or an ``http(s)`` URL of an image to disclose as the monitor's own avatar, the same as for the other commands - see :doc:`check-a-conference`. It can also be set with ``INSPECT_JITSI_AVATAR``. Since the monitor can stay connected for a long time, this is sent once, when it joins, and again on every reconnect.
+
 Exit codes
 ----------
 
@@ -110,4 +140,4 @@ The command is built on a Python API that yields the same dictionaries the comma
     for state in monitor_room("https://meet.example.com/room", timeout=120):
         print(state["status"]["open"], len(state["participants"]))
 
-The loop ends when the room is closed. In asynchronous code, use ``async for state in monitor_conference(url)`` instead. Both accept the same options as the command (``name``, ``timeout``, ``create``, ``stay``) and raise :class:`~inspect_jitsi.xmpp.JitsiConnectionError` when the connection cannot be established or restored. See :func:`~inspect_jitsi.sync.monitor.monitor_room` and :func:`~inspect_jitsi.xmpp.monitor.monitor_conference`.
+The loop ends when the room is closed. In asynchronous code, use ``async for state in monitor_conference(url)`` instead. Both accept the same options as the command (``name``, ``avatar_url``, ``timeout``, ``create``, ``stay``) and raise :class:`~inspect_jitsi.xmpp.JitsiConnectionError` when the connection cannot be established or restored. See :func:`~inspect_jitsi.sync.monitor.monitor_room` and :func:`~inspect_jitsi.xmpp.monitor.monitor_conference`.

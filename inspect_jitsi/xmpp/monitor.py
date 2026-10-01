@@ -76,6 +76,7 @@ async def monitor_conference(
     *,
     nick: str | None = None,
     name: str | None = None,
+    avatar_url: str | None = None,
     anonymous_domain: str | None = None,
     muc_domain: str | None = None,
     timeout: float = 60,
@@ -93,6 +94,10 @@ async def monitor_conference(
         conference_url: e.g. "https://meet.example.com/SomeRoomName".
         nick: the MUC nickname to join under. Random if not given.
         name: the display name (XEP-0172) to disclose when joining.
+        avatar_url: the avatar to disclose when joining (see
+            `inspect_jitsi.xmpp.Participant.avatar_url`);
+            `inspect_jitsi.xmpp.avatar_data_uri` turns a local image file
+            into one.
         anonymous_domain: override the XMPP domain. Auto-discovered if not given.
         muc_domain: override the MUC domain. Auto-discovered if not given.
         timeout: seconds to keep trying to reconnect after the connection
@@ -127,6 +132,7 @@ async def monitor_conference(
             conference_url,
             nick,
             name=name,
+            avatar_url=avatar_url,
             anonymous_domain=anonymous_domain,
             muc_domain=muc_domain,
             timeout=connect_timeout,

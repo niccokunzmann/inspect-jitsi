@@ -334,9 +334,10 @@ class JitsiXmppConnection:
 
     Connects over the WebSocket endpoint the Jitsi web client itself uses,
     joins the room's MUC under the given nickname (disclosing `name` as its
-    XEP-0172 display name, if given - no display name is disclosed by
-    default), and keeps a live roster of the other participants (updated as
-    they join/leave for as long as the connection stays open).
+    XEP-0172 display name and `avatar_url` as its avatar, if given - neither
+    is disclosed by default), and keeps a live roster of the other
+    participants (updated as they join/leave for as long as the connection
+    stays open).
 
     Use as an async context manager::
 
@@ -352,6 +353,7 @@ class JitsiXmppConnection:
         nick: str | None = None,
         *,
         name: str | None = None,
+        avatar_url: str | None = None,
         anonymous_domain: str | None = None,
         muc_domain: str | None = None,
         timeout: float = 10,
@@ -360,6 +362,7 @@ class JitsiXmppConnection:
         self.ws_domain, self.room = parse_conference_url(conference_url)
         self.nick = nick or f"inspect-jitsi-{uuid.uuid4().hex[:8]}"
         self.name = name
+        self.avatar_url = avatar_url
         self.timeout = timeout
         self._anonymous_domain = anonymous_domain
         self._muc_domain = muc_domain
@@ -430,7 +433,9 @@ class JitsiXmppConnection:
                 self.ws, self._anonymous_domain, self.timeout
             )
 
-            await self.ws.send(join_presence(self._occupant_jid, self.name))
+            await self.ws.send(
+                join_presence(self._occupant_jid, self.name, self.avatar_url)
+            )
 
             # Read the initial roster inline, so a failure to join (e.g. a
             # <presence type="error">) raises here rather than being lost in
